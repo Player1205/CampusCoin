@@ -1,82 +1,213 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ArrowLeftRight, Sparkles, Zap,
-  TrendingUp, Users, Star, ArrowRight,
-  Clock, CheckCircle2, Circle,
+  Zap, ArrowRight, RefreshCw, Heart,
+  MessageCircle, ListTodo,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useCoinStore, selectBalance, selectLockedBalance } from '@/store/useCoinStore';
-import TaskCard, { TaskCardSkeleton } from '@/features/swap/components/TaskCard';
+import { useCoinStore, selectBalance } from '@/store/useCoinStore';
 import { fetchTasks } from '@/features/swap/services/swap.api';
+import { fetchPosts } from '@/features/flex/services/flex.api';
+import { usePostActions } from '@/features/flex/hooks/useFlex';
 import type { Task } from '@/features/swap/types';
+import type { Post } from '@/features/flex/types';
+import { CATEGORY_EMOJI, CATEGORY_LABELS, type TaskCategory } from '@/features/swap/types';
+import { POST_TYPE_CONFIG } from '@/features/flex/types';
+import { formatDistanceToNow } from '@/utils/time';
 
-// ─── Stat card ────────────────────────────────────────────────────────────────
+// ─── Task group pill ──────────────────────────────────────────────────────────
 
-function StatCard({ label, value, icon: Icon, accent }: {
-  label: string; value: string | number; icon: React.ElementType; accent: string;
-}) {
-  return (
-    <div className="cc-card p-4 flex items-center gap-4 hover:border-surface-border/80 transition-all">
-      <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
-           style={{ background: `${accent}15` }}>
-        <Icon size={20} style={{ color: accent }} />
-      </div>
-      <div>
-        <p className="font-display text-2xl font-800 text-text-main">{value}</p>
-        <p className="font-body text-xs text-text-muted mt-0.5">{label}</p>
-      </div>
-    </div>
-  );
-}
+const GROUPS: { key: TaskCategory | 'all'; label: string; emoji: string }[] = [
+  { key: 'all',         label: 'All Tasks',    emoji: '⚡' },
+  { key: 'tutoring',    label: 'Tutoring',     emoji: '📚' },
+  { key: 'coding',      label: 'Coding',       emoji: '💻' },
+  { key: 'design',      label: 'Design',       emoji: '🎨' },
+  { key: 'writing',     label: 'Writing',      emoji: '✍️' },
+  { key: 'errands',     label: 'Errands',      emoji: '🏃' },
+  { key: 'notes',       label: 'Notes',        emoji: '📝' },
+  { key: 'photography', label: 'Photography',  emoji: '📷' },
+  { key: 'other',       label: 'Other',        emoji: '🔮' },
+];
 
-// ─── Quick action card ────────────────────────────────────────────────────────
-
-function ActionCard({ icon: Icon, label, sub, onClick, neon = false }: {
-  icon: React.ElementType; label: string; sub: string;
-  onClick: () => void; neon?: boolean;
+function GroupPill({
+  group, active, count, onClick,
+}: {
+  group: typeof GROUPS[0]; active: boolean; count?: number; onClick: () => void;
 }) {
   return (
     <button
       onClick={onClick}
-      className="cc-card p-5 flex flex-col items-start gap-3 w-full text-left
-                 hover:scale-[1.02] active:scale-[0.99] transition-all duration-200"
-      style={neon ? { border: '1px solid rgba(57,255,20,0.25)' } : {}}
+      className="shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-2xl
+                 font-body text-sm font-medium transition-all duration-200 active:scale-95"
+      style={{
+        background: active
+          ? 'var(--primary)'
+          : 'var(--card)',
+        border: `1px solid ${active ? 'var(--primary)' : 'var(--border)'}`,
+        color: active ? '#fff' : 'var(--text-muted)',
+        boxShadow: active ? '0 0 14px rgba(124,58,237,0.4)' : 'none',
+      }}
     >
-      <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-           style={{ background: neon ? 'rgba(57,255,20,0.12)' : 'rgba(124,58,237,0.15)' }}>
-        <Icon size={20} className={neon ? 'text-neon' : 'text-primary-light'} />
-      </div>
-      <div>
-        <p className={`font-display text-base font-700 ${neon ? 'text-neon' : 'text-text-main'}`}>
-          {label}
-        </p>
-        <p className="font-body text-xs text-text-muted mt-0.5">{sub}</p>
-      </div>
-      <ArrowRight size={14} className={neon ? 'text-neon' : 'text-text-dim'} />
+      <span className="text-base leading-none">{group.emoji}</span>
+      <span>{group.label}</span>
+      {count !== undefined && count > 0 && (
+        <span
+          className="ml-1 min-w-[18px] h-[18px] rounded-full flex items-center justify-center
+                     text-[10px] font-bold px-1"
+          style={{
+            background: active ? 'rgba(255,255,255,0.25)' : 'var(--primary)',
+            color: '#fff',
+          }}
+        >
+          {count}
+        </span>
+      )}
     </button>
   );
 }
 
-// ─── Activity item ────────────────────────────────────────────────────────────
+// ─── Compact task card (horizontal scroll) ────────────────────────────────────
 
-function ActivityItem({ icon: Icon, text, time, done = false }: {
-  icon: React.ElementType; text: string; time: string; done?: boolean;
-}) {
+function TaskChip({ task, onClick }: { task: Task; onClick: () => void }) {
+  const urgencyColor = task.urgency === 'high' ? '#f87171' : task.urgency === 'medium' ? '#fbbf24' : '#34d399';
+
   return (
-    <div className="flex items-start gap-3 py-3 border-b border-surface-border/40 last:border-0">
-      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
-        done ? 'bg-neon/10' : 'bg-surface-background border border-surface-border'
-      }`}>
-        <Icon size={14} className={done ? 'text-neon' : 'text-text-dim'} />
+    <button
+      onClick={onClick}
+      className="shrink-0 cc-card cc-card-hover p-4 text-left transition-all duration-200
+                 active:scale-[0.98] w-64"
+      style={{ cursor: 'pointer' }}
+    >
+      {/* Category + urgency */}
+      <div className="flex items-center justify-between mb-2">
+        <span className="cc-tag text-[10px]">
+          {CATEGORY_EMOJI[task.category]} {CATEGORY_LABELS[task.category]}
+        </span>
+        <span className="w-2 h-2 rounded-full"
+              style={{ background: urgencyColor, boxShadow: `0 0 5px ${urgencyColor}` }} />
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="font-body text-sm text-text-main leading-snug">{text}</p>
-        <p className="font-body text-xs text-text-dim mt-0.5">{time}</p>
+
+      {/* Title */}
+      <p className="font-display text-sm font-700 line-clamp-2 mb-3"
+         style={{ color: 'var(--text)', lineHeight: 1.3 }}>
+        {task.title}
+      </p>
+
+      {/* Reward + poster */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1">
+          <Zap size={12} style={{ color: 'var(--accent)' }} fill="currentColor" strokeWidth={0} />
+          <span className="font-mono text-sm font-700" style={{ color: 'var(--accent)' }}>
+            {task.coinReward}
+          </span>
+        </div>
+        <div className="w-5 h-5 rounded-full overflow-hidden"
+             style={{ border: '1px solid var(--border)' }}>
+          {task.poster.avatarUrl ? (
+            <img src={task.poster.avatarUrl} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-[8px] font-bold"
+                 style={{ background: 'rgba(124,58,237,0.2)', color: 'var(--primary-lt)' }}>
+              {task.poster.name.charAt(0)}
+            </div>
+          )}
+        </div>
       </div>
-      {done ? <CheckCircle2 size={14} className="text-neon shrink-0 mt-1" />
-            : <Circle size={14} className="text-text-dim shrink-0 mt-1" />}
-    </div>
+    </button>
+  );
+}
+
+// ─── Feed post card ───────────────────────────────────────────────────────────
+
+function FeedCard({
+  post,
+  onLike,
+}: {
+  post: Post;
+  onLike: (id: string) => void;
+}) {
+  const currentUser = useAuthStore((s) => s.user);
+  const hasLiked    = currentUser ? post.likes.includes(currentUser._id) : false;
+  const cfg         = POST_TYPE_CONFIG[post.type];
+
+  return (
+    <article
+      className="cc-card p-5 space-y-3.5 animate-fade-in"
+      style={{ '--hover-border': 'rgba(124,58,237,0.3)' } as React.CSSProperties}
+    >
+      {/* Author row */}
+      <div className="flex items-start gap-3">
+        <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0"
+             style={{ border: '1px solid var(--border)' }}>
+          {post.author.avatarUrl ? (
+            <img src={post.author.avatarUrl} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center"
+                 style={{ background: 'rgba(124,58,237,0.2)' }}>
+              <span className="font-display text-sm font-700" style={{ color: 'var(--primary-lt)' }}>
+                {post.author.name.charAt(0).toUpperCase()}
+              </span>
+            </div>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-display text-sm font-700" style={{ color: 'var(--text)' }}>
+              {post.author.name}
+            </span>
+            {post.author.department && (
+              <span className="font-body text-xs" style={{ color: 'var(--text-dim)' }}>
+                · {post.author.department}
+              </span>
+            )}
+          </div>
+          <p className="font-body text-[11px]" style={{ color: 'var(--text-dim)' }}>
+            {formatDistanceToNow(new Date(post.createdAt))}
+          </p>
+        </div>
+        <span className="cc-tag text-[10px] shrink-0" style={{ color: cfg.color as string }}>
+          {cfg.emoji} {cfg.label}
+        </span>
+      </div>
+
+      {/* Content */}
+      <p className="font-body text-sm leading-relaxed" style={{ color: 'var(--text)' }}>
+        {post.content}
+      </p>
+
+      {/* Image */}
+      {post.imageUrl && (
+        <div className="rounded-xl overflow-hidden max-h-64"
+             style={{ border: '1px solid var(--border)' }}>
+          <img src={post.imageUrl} alt="post" className="w-full object-cover" />
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex items-center gap-1 pt-1"
+           style={{ borderTop: '1px solid var(--border-sub)' }}>
+        <button
+          onClick={() => onLike(post._id)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-body
+                     font-medium transition-all active:scale-95"
+          style={{
+            color: hasLiked ? '#f87171' : 'var(--text-dim)',
+            background: hasLiked ? 'rgba(248,113,113,0.08)' : 'transparent',
+          }}
+        >
+          <Heart size={14} fill={hasLiked ? 'currentColor' : 'none'} />
+          {post.likes.length > 0 ? post.likes.length : 'Like'}
+        </button>
+        <button
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-body
+                     font-medium transition-all active:scale-95"
+          style={{ color: 'var(--text-dim)' }}
+        >
+          <MessageCircle size={14} />
+          {post.comments.length > 0 ? post.comments.length : 'Comment'}
+        </button>
+      </div>
+    </article>
   );
 }
 
@@ -85,203 +216,343 @@ function ActivityItem({ icon: Icon, text, time, done = false }: {
 export default function Home() {
   const user     = useAuthStore((s) => s.user);
   const balance  = useCoinStore(selectBalance);
-  const locked   = useCoinStore(selectLockedBalance);
   const navigate = useNavigate();
 
-  const [tasks, setTasks]       = useState<Task[]>([]);
-  const [isLoading, setLoading] = useState(true);
+  const [activeGroup,  setActiveGroup]  = useState<TaskCategory | 'all'>('all');
+  const [tasks,        setTasks]        = useState<Task[]>([]);
+  const [posts,        setPosts]        = useState<Post[]>([]);
+  const [postPage,     setPostPage]     = useState(1);
+  const [hasMore,      setHasMore]      = useState(false);
+  const [tasksLoading, setTasksLoading] = useState(true);
+  const [postsLoading, setPostsLoading] = useState(true);
+  const [loadingMore,  setLoadingMore]  = useState(false);
+  const [groupCounts,  setGroupCounts]  = useState<Record<string, number>>({});
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Dummy updatePost for onLike
+  const [localPosts, setLocalPosts] = useState<Post[]>([]);
+  const updatePost = (id: string, fn: (p: Post) => Post) =>
+    setLocalPosts((prev) => prev.map((p) => (p._id === id ? fn(p) : p)));
+  const { toggleLike } = usePostActions(updatePost);
 
   const firstName = user?.name.split(' ')[0] ?? 'there';
   const hour      = new Date().getHours();
-  const greeting  = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const greeting  = hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening';
 
+  // Load tasks for active group
   useEffect(() => {
-    fetchTasks({ limit: 4, sortBy: 'newest', status: 'open' })
+    setTasksLoading(true);
+    fetchTasks({
+      limit: 12,
+      sortBy: 'newest',
+      status: 'open',
+      category: activeGroup === 'all' ? undefined : activeGroup,
+    })
       .then((r) => setTasks(r.data))
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => setTasksLoading(false));
+  }, [activeGroup]);
+
+  // Load group counts once
+  useEffect(() => {
+    const cats: TaskCategory[] = ['tutoring', 'coding', 'design', 'writing', 'errands', 'notes', 'photography', 'other'];
+    Promise.all(cats.map((c) =>
+      fetchTasks({ limit: 1, status: 'open', category: c }).then((r) => ({ c, total: r.pagination.total }))
+    )).then((results) => {
+      const counts: Record<string, number> = {};
+      results.forEach(({ c, total }) => { counts[c] = total; });
+      setGroupCounts(counts);
+    }).catch(() => {});
   }, []);
+
+  // Load posts (feed)
+  useEffect(() => {
+    setPostsLoading(true);
+    fetchPosts({ page: 1, limit: 8, sortBy: 'newest' })
+      .then((r) => {
+        setPosts(r.data);
+        setLocalPosts(r.data);
+        setHasMore(r.pagination.hasNextPage);
+      })
+      .catch(() => {})
+      .finally(() => setPostsLoading(false));
+  }, []);
+
+  // Sync localPosts ← posts whenever posts reset
+  useEffect(() => { setLocalPosts(posts); }, [posts]);
+
+  const loadMorePosts = async () => {
+    setLoadingMore(true);
+    try {
+      const r = await fetchPosts({ page: postPage + 1, limit: 8, sortBy: 'newest' });
+      setPostPage((p) => p + 1);
+      setLocalPosts((prev) => [...prev, ...r.data]);
+      setHasMore(r.pagination.hasNextPage);
+    } catch {
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   return (
     <div className="min-h-full">
-      <div className="content-wrap py-8">
+      <div className="content-wrap py-6 lg:py-8 space-y-7">
 
-        {/* ── Page header ─────────────────────────────────────────── */}
-        <div className="mb-8">
-          <p className="font-body text-sm text-text-muted">{greeting},</p>
-          <h1 className="font-display text-3xl lg:text-4xl font-800 text-text-main mt-1">
-            {firstName} 👋
-          </h1>
-          <p className="font-body text-sm text-text-dim mt-1">{user?.university}</p>
-        </div>
+        {/* ── Greeting + balance ──────────────────────────────────────── */}
+        <div className="cc-card p-5 lg:p-6 relative overflow-hidden">
+          <div className="pointer-events-none absolute -top-16 -right-16 w-56 h-56 rounded-full opacity-20"
+               style={{ background: 'radial-gradient(circle, var(--primary), transparent 70%)' }} />
+          <div className="pointer-events-none absolute -bottom-10 -left-10 w-40 h-40 rounded-full opacity-10"
+               style={{ background: 'radial-gradient(circle, var(--accent), transparent 70%)' }} />
 
-        {/* ── Desktop: two-column grid ─────────────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="relative flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <p className="font-body text-sm" style={{ color: 'var(--text-muted)' }}>
+                {greeting}, 👋
+              </p>
+              <h1 className="font-display text-2xl lg:text-3xl font-800 mt-0.5"
+                  style={{ color: 'var(--text)' }}>
+                {firstName}
+              </h1>
+              <p className="font-body text-xs mt-1" style={{ color: 'var(--text-dim)' }}>
+                {user?.university}
+              </p>
+            </div>
 
-          {/* ── Left column (2/3 width) ── */}
-          <div className="lg:col-span-2 space-y-6">
-
-            {/* Hero balance card */}
-            <div className="cc-card p-6 relative overflow-hidden"
-                 style={{ border: '1px solid rgba(57,255,20,0.2)' }}>
-              <div className="pointer-events-none absolute -top-16 -right-16 w-56 h-56 rounded-full opacity-20"
-                   style={{ background: 'radial-gradient(circle, #7C3AED, transparent 70%)' }} />
-              <div className="pointer-events-none absolute -bottom-12 -left-12 w-40 h-40 rounded-full opacity-10"
-                   style={{ background: 'radial-gradient(circle, #39FF14, transparent 70%)' }} />
-
-              <div className="relative flex items-center justify-between flex-wrap gap-4">
-                <div className="flex items-center gap-5">
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center animate-coin-pulse"
-                       style={{ background: 'rgba(57,255,20,0.12)', border: '1px solid rgba(57,255,20,0.25)' }}>
-                    <Zap size={26} className="text-neon" fill="currentColor" strokeWidth={0} />
-                  </div>
-                  <div>
-                    <p className="font-body text-sm text-text-muted">Available balance</p>
-                    <p className="font-mono text-4xl font-700 text-neon leading-none"
-                       style={{ textShadow: '0 0 20px rgba(57,255,20,0.5)' }}>
-                      {balance.toLocaleString()}
-                    </p>
-                    {locked > 0 && (
-                      <p className="font-body text-xs text-text-dim mt-1">
-                        + {locked.toLocaleString()} locked in escrow
-                      </p>
-                    )}
-                  </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 px-4 py-3 rounded-2xl"
+                   style={{
+                     background: 'var(--accent-sub)',
+                     border: '1px solid color-mix(in srgb, var(--accent) 25%, transparent)',
+                   }}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center animate-coin-pulse"
+                     style={{ background: 'color-mix(in srgb, var(--accent) 15%, transparent)' }}>
+                  <Zap size={20} style={{ color: 'var(--accent)' }} fill="currentColor" strokeWidth={0} />
                 </div>
-                <button className="btn-neon">Send Coins</button>
-              </div>
-            </div>
-
-            {/* Stats row */}
-            <div className="grid grid-cols-3 gap-4">
-              <StatCard label="Open Tasks"    value="24"  icon={TrendingUp} accent="#7C3AED" />
-              <StatCard label="Active Users"  value="138" icon={Users}      accent="#39FF14" />
-              <StatCard label="Avg Rating"    value="4.9" icon={Star}       accent="#fbbf24" />
-            </div>
-
-            {/* Quick actions */}
-            <div>
-              <h2 className="font-display text-sm font-700 text-text-dim uppercase tracking-widest mb-3">
-                Quick Actions
-              </h2>
-              <div className="grid grid-cols-2 gap-4">
-                <ActionCard
-                  icon={ArrowLeftRight}
-                  label="Browse Tasks"
-                  sub="Find gigs, earn coins"
-                  onClick={() => navigate('/swap')}
-                />
-                <ActionCard
-                  icon={Sparkles}
-                  label="Post to Flex"
-                  sub="Share a win with campus"
-                  onClick={() => navigate('/flex')}
-                  neon
-                />
-              </div>
-            </div>
-
-            {/* Latest tasks */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-display text-sm font-700 text-text-dim uppercase tracking-widest">
-                  Latest Tasks
-                </h2>
-                <button
-                  onClick={() => navigate('/swap')}
-                  className="flex items-center gap-1 font-body text-xs text-primary-light
-                             hover:text-primary transition-colors"
-                >
-                  See all <ArrowRight size={12} />
-                </button>
-              </div>
-
-              {/* Desktop: 2-col task grid */}
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-                {isLoading
-                  ? Array.from({ length: 4 }).map((_, i) => <TaskCardSkeleton key={i} />)
-                  : tasks.length === 0
-                  ? (
-                    <div className="col-span-2 cc-card p-8 text-center space-y-3">
-                      <p className="font-display text-lg font-700 text-text-muted">No tasks yet</p>
-                      <button onClick={() => navigate('/swap')} className="btn-neon mx-auto">
-                        Post First Task
-                      </button>
-                    </div>
-                  )
-                  : tasks.map((task) => (
-                    <TaskCard key={task._id} task={task} compact />
-                  ))
-                }
+                <div>
+                  <p className="font-body text-[10px] uppercase tracking-wider"
+                     style={{ color: 'var(--text-dim)' }}>Balance</p>
+                  <p className="font-mono text-2xl font-700 leading-none"
+                     style={{ color: 'var(--accent)', textShadow: '0 0 12px var(--accent-glow)' }}>
+                    {balance.toLocaleString()}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* ── Right column (1/3 width) — desktop only ── */}
-          <div className="hidden lg:flex flex-col gap-5">
+        {/* ── Task Groups — horizontal scroll ─────────────────────────── */}
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-display text-base font-700 uppercase tracking-widest"
+                style={{ color: 'var(--text-dim)', fontSize: '0.7rem' }}>
+              Browse by Group
+            </h2>
+            <button
+              onClick={() => navigate('/tasks')}
+              className="flex items-center gap-1 font-body text-xs transition-colors"
+              style={{ color: 'var(--primary-lt)' }}
+            >
+              All tasks <ArrowRight size={12} />
+            </button>
+          </div>
 
-            {/* Profile mini-card */}
-            <div className="cc-card p-5 text-center space-y-3">
-              <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-primary/40
-                              shadow-violet mx-auto">
-                {user?.avatarUrl ? (
-                  <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-primary/20">
-                    <span className="font-display text-2xl font-700 text-primary-light">
-                      {user?.name.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                )}
+          {/* Group pills scroll */}
+          <div
+            className="flex gap-2.5 overflow-x-auto scrollbar-none pb-1"
+            ref={scrollRef}
+          >
+            {GROUPS.map((g) => (
+              <GroupPill
+                key={g.key}
+                group={g}
+                active={activeGroup === g.key}
+                count={g.key === 'all' ? undefined : groupCounts[g.key]}
+                onClick={() => setActiveGroup(g.key as TaskCategory | 'all')}
+              />
+            ))}
+          </div>
+
+          {/* Task chips horizontal scroll */}
+          <div className="flex gap-3 overflow-x-auto scrollbar-none pb-1 mt-4">
+            {tasksLoading ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="shrink-0 w-64 h-32 skeleton" />
+              ))
+            ) : tasks.length === 0 ? (
+              <div className="cc-card p-6 flex flex-col items-center gap-3 w-full text-center">
+                <ListTodo size={28} style={{ color: 'var(--text-dim)' }} strokeWidth={1.5} />
+                <p className="font-body text-sm" style={{ color: 'var(--text-muted)' }}>
+                  No tasks in this group yet.
+                </p>
+                <button onClick={() => navigate('/tasks')} className="btn-neon text-xs px-4 py-1.5">
+                  Post First Task
+                </button>
               </div>
-              <div>
-                <p className="font-display text-base font-700 text-text-main">{user?.name}</p>
-                <p className="font-body text-xs text-text-dim mt-0.5">{user?.department || user?.university}</p>
-              </div>
-              {user?.skills && user.skills.length > 0 && (
-                <div className="flex flex-wrap justify-center gap-1.5">
-                  {user.skills.slice(0, 4).map((s) => (
-                    <span key={s} className="cc-tag text-[10px]">{s}</span>
+            ) : (
+              tasks.map((task) => (
+                <TaskChip
+                  key={task._id}
+                  task={task}
+                  onClick={() => navigate(`/tasks`)}
+                />
+              ))
+            )}
+          </div>
+        </section>
+
+        {/* ── Campus Feed ─────────────────────────────────────────────── */}
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display text-base font-700 uppercase tracking-widest"
+                style={{ color: 'var(--text-dim)', fontSize: '0.7rem' }}>
+              Campus Feed
+            </h2>
+            <button
+              onClick={() => navigate('/flex')}
+              className="flex items-center gap-1 font-body text-xs transition-colors"
+              style={{ color: 'var(--primary-lt)' }}
+            >
+              See all <ArrowRight size={12} />
+            </button>
+          </div>
+
+          {/* Desktop: two-col feed + right panel */}
+          <div className="flex gap-7">
+            <div className="flex-1 min-w-0 space-y-4">
+              {postsLoading ? (
+                <div className="space-y-4 animate-stagger">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="cc-card p-5 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="skeleton w-10 h-10 rounded-xl" />
+                        <div className="flex-1 space-y-2">
+                          <div className="skeleton h-3 w-32 rounded" />
+                          <div className="skeleton h-2.5 w-20 rounded" />
+                        </div>
+                      </div>
+                      <div className="skeleton h-3 w-full rounded" />
+                      <div className="skeleton h-3 w-4/5 rounded" />
+                    </div>
+                  ))}
+                </div>
+              ) : localPosts.length === 0 ? (
+                <div className="cc-card p-10 text-center space-y-3">
+                  <p className="font-display text-base font-700" style={{ color: 'var(--text-muted)' }}>
+                    No posts yet
+                  </p>
+                  <p className="font-body text-sm" style={{ color: 'var(--text-dim)' }}>
+                    Be the first to flex on your campus.
+                  </p>
+                  <button onClick={() => navigate('/flex')} className="btn-primary mx-auto">
+                    Write a Post
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4 animate-stagger">
+                  {localPosts.map((post) => (
+                    <FeedCard key={post._id} post={post} onLike={toggleLike} />
                   ))}
                 </div>
               )}
-              <button
-                onClick={() => navigate('/profile')}
-                className="btn-ghost w-full text-xs py-2"
-              >
-                View Profile
-              </button>
+
+              {/* Load more */}
+              {hasMore && (
+                <button
+                  onClick={loadMorePosts}
+                  disabled={loadingMore}
+                  className="w-full btn-ghost flex items-center justify-center gap-2"
+                >
+                  {loadingMore ? (
+                    <><span className="w-4 h-4 border-2 rounded-full animate-spin"
+                            style={{ borderColor: 'var(--border)', borderTopColor: 'var(--primary-lt)' }} />
+                    Loading…</>
+                  ) : (
+                    <><RefreshCw size={14} /> Load more posts</>
+                  )}
+                </button>
+              )}
             </div>
 
-            {/* Recent activity */}
-            <div className="cc-card p-5">
-              <h3 className="font-display text-sm font-700 text-text-dim uppercase tracking-widest mb-3">
-                Recent Activity
-              </h3>
-              <div className="space-y-0">
-                <ActivityItem icon={CheckCircle2} text="Account created successfully" time="Just now" done />
-                <ActivityItem icon={Zap}          text="100 starter coins credited"   time="Just now" done />
-                <ActivityItem icon={ArrowLeftRight} text="Post your first task"       time="Pending" />
-                <ActivityItem icon={Sparkles}     text="Make a Flex post"             time="Pending" />
+            {/* Desktop right sidebar */}
+            <aside className="hidden lg:flex flex-col gap-5 w-64 xl:w-72 shrink-0">
+              <div className="cc-card p-4 space-y-3">
+                <h3 className="font-display text-xs font-700 uppercase tracking-widest"
+                    style={{ color: 'var(--text-dim)' }}>
+                  Quick Actions
+                </h3>
+                <button
+                  onClick={() => navigate('/tasks')}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  style={{ background: 'var(--card-alt)', border: '1px solid var(--border)' }}
+                >
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+                       style={{ background: 'rgba(124,58,237,0.15)' }}>
+                    <ListTodo size={16} style={{ color: 'var(--primary-lt)' }} />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-body text-sm font-semibold" style={{ color: 'var(--text)' }}>
+                      Browse Tasks
+                    </p>
+                    <p className="font-body text-xs" style={{ color: 'var(--text-dim)' }}>
+                      Earn coins by helping others
+                    </p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => navigate('/flex')}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  style={{
+                    background: 'var(--accent-sub)',
+                    border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)',
+                  }}
+                >
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+                       style={{ background: 'color-mix(in srgb, var(--accent) 20%, transparent)' }}>
+                    <span className="text-base">✨</span>
+                  </div>
+                  <div className="text-left">
+                    <p className="font-body text-sm font-semibold" style={{ color: 'var(--accent)' }}>
+                      Post to Flex
+                    </p>
+                    <p className="font-body text-xs" style={{ color: 'var(--text-dim)' }}>
+                      Share wins with campus
+                    </p>
+                  </div>
+                </button>
               </div>
-            </div>
 
-            {/* Tips card */}
-            <div className="cc-card p-5 space-y-3"
-                 style={{ border: '1px solid rgba(124,58,237,0.25)', background: 'rgba(124,58,237,0.05)' }}>
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-primary/20 flex items-center justify-center">
-                  <Star size={12} className="text-primary-light" />
+              {/* Profile mini */}
+              <div className="cc-card p-4 space-y-3 text-center">
+                <div className="w-14 h-14 rounded-2xl overflow-hidden mx-auto"
+                     style={{ border: '2px solid rgba(124,58,237,0.4)' }}>
+                  {user?.avatarUrl ? (
+                    <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center"
+                         style={{ background: 'rgba(124,58,237,0.2)' }}>
+                      <span className="font-display text-xl font-700" style={{ color: 'var(--primary-lt)' }}>
+                        {user?.name.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
                 </div>
-                <h3 className="font-display text-sm font-700 text-primary-light">Pro Tip</h3>
+                <div>
+                  <p className="font-display text-sm font-700" style={{ color: 'var(--text)' }}>
+                    {user?.name}
+                  </p>
+                  <p className="font-body text-xs mt-0.5" style={{ color: 'var(--text-dim)' }}>
+                    {user?.department || user?.university}
+                  </p>
+                </div>
+                <button onClick={() => navigate('/profile')} className="btn-ghost w-full text-xs py-2">
+                  View Profile
+                </button>
               </div>
-              <p className="font-body text-xs text-text-muted leading-relaxed">
-                Post tasks with <span className="text-neon">neon-highlighted</span> rewards to attract
-                more applicants. Coins locked in escrow are automatically released on completion.
-              </p>
-            </div>
+            </aside>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );

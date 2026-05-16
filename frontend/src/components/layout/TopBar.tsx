@@ -1,57 +1,44 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Bell, Zap } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useCoinStore, selectBalance, selectIsAnimating } from '@/store/useCoinStore';
+import ThemeToggle from '@/components/ui/ThemeToggle';
 
-// ─── Coin display component ───────────────────────────────────────────────────
+const PAGE_TITLES: Record<string, string> = {
+  '/':        'CampusCoin',
+  '/home':    'Home',
+  '/tasks':   'Tasks',
+  '/flex':    'Flex',
+  '/profile': 'Profile',
+};
 
 function CoinBalance() {
-  const balance = useCoinStore(selectBalance);
+  const balance     = useCoinStore(selectBalance);
   const isAnimating = useCoinStore(selectIsAnimating);
-  const prevRef = useRef(balance);
-  const direction = balance > prevRef.current ? 'up' : 'down';
-
-  useEffect(() => {
-    prevRef.current = balance;
-  }, [balance]);
+  const prevRef     = useRef(balance);
+  const wentUp      = balance >= prevRef.current;
+  if (balance !== prevRef.current) prevRef.current = balance;
 
   return (
     <div
-      className={[
-        'flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all duration-300',
-        isAnimating
-          ? 'border-neon shadow-neon-sm bg-neon/5'
-          : 'border-surface-border bg-surface-card',
-      ].join(' ')}
-      aria-label={`CampusCoin balance: ${balance}`}
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all duration-300"
+      style={{
+        background: isAnimating ? 'var(--accent-sub)' : 'var(--card)',
+        borderColor: isAnimating ? 'var(--accent)' : 'var(--border)',
+        boxShadow: isAnimating ? '0 0 10px var(--accent-glow)' : 'none',
+      }}
     >
-      {/* Neon coin icon */}
-      <div
-        className={[
-          'w-5 h-5 rounded-full flex items-center justify-center transition-all duration-300',
-          isAnimating ? 'shadow-neon-sm' : '',
-        ].join(' ')}
-        style={{ background: isAnimating ? '#39FF14' : 'rgba(57,255,20,0.15)' }}
-      >
-        <Zap
-          size={11}
-          className={isAnimating ? 'text-surface-background' : 'text-neon'}
-          fill="currentColor"
-          strokeWidth={0}
-        />
+      <div className="w-5 h-5 rounded-full flex items-center justify-center"
+           style={{ background: 'var(--accent-sub)' }}>
+        <Zap size={11} style={{ color: 'var(--accent)' }} fill="currentColor" strokeWidth={0} />
       </div>
-
-      {/* Balance number */}
       <span
-        className={[
-          'font-mono text-sm font-semibold tabular-nums transition-all duration-300',
-          isAnimating
-            ? direction === 'up'
-              ? 'text-neon text-neon-glow'
-              : 'text-red-400'
-            : 'text-neon',
-        ].join(' ')}
+        className="font-mono text-sm font-semibold tabular-nums"
+        style={{
+          color: isAnimating ? (wentUp ? 'var(--accent)' : '#f87171') : 'var(--accent)',
+          textShadow: isAnimating ? '0 0 8px var(--accent-glow)' : 'none',
+        }}
       >
         {balance.toLocaleString()}
       </span>
@@ -59,91 +46,54 @@ function CoinBalance() {
   );
 }
 
-// ─── Page title map ───────────────────────────────────────────────────────────
-
-const PAGE_TITLES: Record<string, string> = {
-  '/swap':    'Swap',
-  '/flex':    'Flex',
-  '/profile': 'Profile',
-  '/':        'Home',
-};
-
-function usePageTitle() {
-  const { pathname } = useLocation();
-  const matched = Object.entries(PAGE_TITLES).find(([path]) =>
-    path === '/' ? pathname === '/' : pathname.startsWith(path)
-  );
-  return matched?.[1] ?? 'CampusCoin';
-}
-
-// ─── TopBar ───────────────────────────────────────────────────────────────────
-
 export default function TopBar() {
-  const user = useAuthStore((s) => s.user);
-  const title = usePageTitle();
+  const user     = useAuthStore((s) => s.user);
+  const location = useLocation();
+  const title    = PAGE_TITLES[location.pathname] ?? 'CampusCoin';
 
   return (
     <header
-      className="fixed top-0 inset-x-0 z-40 flex items-center justify-between px-4"
+      className="fixed top-0 inset-x-0 z-40 flex items-center justify-between px-4 lg:hidden"
       style={{ height: 'var(--topbar-h)' }}
     >
-      {/* Frosted glass backdrop */}
-      <div
-        className="absolute inset-0 border-b border-surface-border/60"
-        style={{
-          background: 'rgba(15, 23, 42, 0.88)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-        }}
-      />
+      <div className="absolute inset-0 border-b glass" style={{ borderColor: 'var(--border)' }} />
 
-      {/* Left: Logo or page title */}
-      <div className="relative flex items-center gap-3">
-        <Link to="/" className="flex items-center gap-2 group">
-          {/* CC logo mark */}
-          <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center shadow-violet">
+      {/* Left: logo + title */}
+      <div className="relative flex items-center gap-2.5">
+        <Link to="/home" className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+               style={{ background: 'var(--primary)', boxShadow: '0 0 12px rgba(124,58,237,0.5)' }}>
             <span className="font-display text-xs font-800 text-white leading-none">CC</span>
           </div>
-          <span className="font-display text-base font-700 text-text-main tracking-tight hidden xs:block">
+          <span className="font-display text-base font-700" style={{ color: 'var(--text)' }}>
             {title}
           </span>
         </Link>
       </div>
 
-      {/* Right: Balance + Notifications */}
+      {/* Right */}
       <div className="relative flex items-center gap-2">
         <CoinBalance />
-
-        {/* Notification bell */}
+        <ThemeToggle />
         <button
-          className="relative w-9 h-9 rounded-xl flex items-center justify-center
-                     bg-surface-card border border-surface-border
-                     hover:border-primary-light transition-colors duration-200
-                     active:scale-95"
+          className="relative w-9 h-9 rounded-xl flex items-center justify-center transition-colors active:scale-90"
+          style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
           aria-label="Notifications"
         >
-          <Bell size={16} className="text-text-muted" />
-          {/* Unread dot (always visible for now — wire up to notification store later) */}
-          <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-neon shadow-neon-sm" />
+          <Bell size={15} style={{ color: 'var(--text-muted)' }} />
+          <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full"
+                style={{ background: 'var(--accent)', boxShadow: '0 0 4px var(--accent-glow)' }} />
         </button>
-
-        {/* Avatar */}
         {user && (
-          <Link
-            to="/profile"
-            className="w-9 h-9 rounded-xl overflow-hidden border border-surface-border
-                       hover:border-primary-light transition-colors duration-200 active:scale-95"
-            aria-label="Go to profile"
-          >
+          <Link to="/profile"
+                className="w-9 h-9 rounded-xl overflow-hidden transition-all active:scale-90"
+                style={{ border: '1px solid var(--border)' }}>
             {user.avatarUrl ? (
-              <img
-                src={user.avatarUrl}
-                alt={user.name}
-                className="w-full h-full object-cover"
-              />
+              <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-primary/20">
-                <span className="font-display text-sm font-700 text-primary-light">
+              <div className="w-full h-full flex items-center justify-center"
+                   style={{ background: 'rgba(124,58,237,0.2)' }}>
+                <span className="font-display text-sm font-700" style={{ color: 'var(--primary-lt)' }}>
                   {user.name.charAt(0).toUpperCase()}
                 </span>
               </div>

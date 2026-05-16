@@ -7,20 +7,17 @@ import {
   type RouteObject,
 } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import { useThemeStore } from '@/store/useThemeStore';
 
-// Layout
-import AppLayout from '@/components/layout/AppLayout';
-
-// Pages
+import AppLayout    from '@/components/layout/AppLayout';
 import LoginPage    from '@/pages/LoginPage';
 import RegisterPage from '@/pages/RegisterPage';
 import Home         from '@/pages/Home';
-import Swap         from '@/pages/Swap';
+import Tasks        from '@/pages/Tasks';
 import Flex         from '@/pages/Flex';
 import Profile      from '@/pages/Profile';
 import NotFoundPage from '@/pages/NotFoundPage';
 
-// State
 import { useAuthStore } from '@/store/useAuthStore';
 
 // ─── Auth guards ──────────────────────────────────────────────────────────────
@@ -40,7 +37,6 @@ function RequireGuest() {
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
 const routes: RouteObject[] = [
-  // Public
   {
     element: <RequireGuest />,
     children: [
@@ -48,24 +44,21 @@ const routes: RouteObject[] = [
       { path: '/register', element: <RegisterPage /> },
     ],
   },
-
-  // Protected
   {
     element: <RequireAuth />,
     children: [
       {
         element: <AppLayout />,
         children: [
-          { index: true,     element: <Navigate to="/home" replace /> },
-          { path: '/home',    element: <Home /> },
-          { path: '/swap',    element: <Swap /> },
-          { path: '/flex',    element: <Flex /> },
-          { path: '/profile', element: <Profile /> },
+          { index: true,     element: <Navigate to="/home"  replace /> },
+          { path: '/home',   element: <Home /> },
+          { path: '/tasks',  element: <Tasks /> },
+          { path: '/flex',   element: <Flex /> },
+          { path: '/profile',element: <Profile /> },
         ],
       },
     ],
   },
-
   { path: '*', element: <NotFoundPage /> },
 ];
 
@@ -75,31 +68,44 @@ const router = createBrowserRouter(routes);
 
 export default function App() {
   const fetchMe = useAuthStore((s) => s.fetchMe);
+  const theme   = useThemeStore((s) => s.theme);
 
-  useEffect(() => {
-    void fetchMe();
-  }, [fetchMe]);
+  // Hydrate user on every mount (handles page refresh)
+  useEffect(() => { void fetchMe(); }, [fetchMe]);
+
+  // Toast colours change with theme
+  const isDark = theme === 'dark';
 
   return (
     <>
       <RouterProvider router={router} />
+
       <Toaster
         position="top-center"
         gutter={10}
         toastOptions={{
           duration: 3500,
           style: {
-            background: '#1E293B',
-            color: '#F8FAFC',
-            border: '1px solid #334155',
+            background: isDark ? '#1E293B' : '#FFFFFF',
+            color:      isDark ? '#F8FAFC' : '#1C1917',
+            border:     `1px solid ${isDark ? '#334155' : '#E8E0D8'}`,
             borderRadius: '12px',
             fontFamily: '"DM Sans", sans-serif',
-            fontSize: '14px',
-            padding: '12px 16px',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+            fontSize:   '14px',
+            padding:    '12px 16px',
+            boxShadow:  isDark
+              ? '0 8px 32px rgba(0,0,0,0.5)'
+              : '0 4px 20px rgba(0,0,0,0.1)',
           },
-          success: { iconTheme: { primary: '#39FF14', secondary: '#0F172A' } },
-          error:   { iconTheme: { primary: '#f87171', secondary: '#0F172A' } },
+          success: {
+            iconTheme: {
+              primary:   isDark ? '#39FF14' : '#16A34A',
+              secondary: isDark ? '#0F172A' : '#FFFFFF',
+            },
+          },
+          error: {
+            iconTheme: { primary: '#f87171', secondary: isDark ? '#0F172A' : '#FFFFFF' },
+          },
         }}
       />
     </>

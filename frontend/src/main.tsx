@@ -2,18 +2,13 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import './assets/index.css';
+import { initTheme } from './store/useThemeStore';
 
-// ── PWA service worker registration (vite-plugin-pwa) ────────────────────────
-// The plugin auto-generates and registers the SW; nothing extra needed here.
-// To test locally, set devOptions.enabled = true in vite.config.ts.
+// Apply persisted theme before React paints — prevents flash
+initTheme();
 
 const container = document.getElementById('root');
-
-if (!container) {
-  throw new Error(
-    '[CampusCoin] Root element #root not found. Check index.html.'
-  );
-}
+if (!container) throw new Error('[CampusCoin] #root not found.');
 
 createRoot(container).render(
   <StrictMode>
