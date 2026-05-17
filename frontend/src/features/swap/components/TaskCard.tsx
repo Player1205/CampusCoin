@@ -1,15 +1,12 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Zap, Clock, Users, Eye, ArrowRight,
-  Flame, AlertCircle, TrendingDown,
-} from 'lucide-react';
+import { Zap, Clock, Users, Eye, Flame, AlertCircle, TrendingDown, MessageCircle } from 'lucide-react';
 import type { Task } from '../types';
-import {
-  CATEGORY_EMOJI, CATEGORY_LABELS,
-  URGENCY_CONFIG,
-} from '../types';
+import { CATEGORY_EMOJI, CATEGORY_LABELS, URGENCY_CONFIG } from '../types';
 import { useAuthStore } from '@/store/useAuthStore';
+import { expressInterest } from '@/features/chat/services/chat.api';
 import { formatDistanceToNow } from '@/utils/time';
+import toast from 'react-hot-toast';
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 
@@ -21,31 +18,27 @@ export function TaskCardSkeleton() {
           <div className="skeleton h-3.5 w-16 rounded-full" />
           <div className="skeleton h-4 w-4/5 rounded-lg" />
         </div>
-        <div className="skeleton h-9 w-16 rounded-xl" />
+        <div className="skeleton h-10 w-16 rounded-xl" />
       </div>
-      <div className="space-y-2">
-        <div className="skeleton h-3 w-full rounded-lg" />
-        <div className="skeleton h-3 w-3/4 rounded-lg" />
-      </div>
-      <div className="flex items-center gap-2">
+      <div className="skeleton h-3 w-full rounded-lg" />
+      <div className="skeleton h-3 w-3/4 rounded-lg" />
+      <div className="flex gap-2">
         <div className="skeleton h-5 w-20 rounded-full" />
         <div className="skeleton h-5 w-16 rounded-full" />
       </div>
-      <div className="flex items-center justify-between pt-1">
+      <div className="flex justify-between items-center">
         <div className="flex items-center gap-2">
           <div className="skeleton w-6 h-6 rounded-full" />
           <div className="skeleton h-3 w-24 rounded-lg" />
         </div>
-        <div className="skeleton h-8 w-24 rounded-xl" />
+        <div className="skeleton h-8 w-32 rounded-xl" />
       </div>
     </div>
   );
 }
 
-// ─── Urgency icon ─────────────────────────────────────────────────────────────
-
-const URGENCY_ICON = {
-  high:   <Flame   size={11} />,
+const URGENCY_ICON: Record<string, React.ReactNode> = {
+  high:   <Flame size={11} />,
   medium: <AlertCircle size={11} />,
   low:    <TrendingDown size={11} />,
 };
@@ -54,185 +47,163 @@ const URGENCY_ICON = {
 
 interface TaskCardProps {
   task: Task;
-  onApply?: (task: Task) => void;
   compact?: boolean;
+  onInterested?: (chatId: string) => void; // called when chat is created
 }
 
-export default function TaskCard({ task, onApply, compact = false }: TaskCardProps) {
-  const navigate  = useNavigate();
+export default function TaskCard({ task, compact = false, onInterested }: TaskCardProps) {
+  const navigate    = useNavigate();
   const currentUser = useAuthStore((s) => s.user);
+  const [loading,   setLoading]   = useState(false);
+  const [chatted,   setChatted]   = useState(false);
+
   const urgency   = URGENCY_CONFIG[task.urgency];
   const isOwnTask = currentUser?._id === task.poster._id;
-
-  const hasApplied = task.applications.some(
-    (a) => a.applicant._id === currentUser?._id && !a.isWithdrawn
-  );
-
-  const deadlineStr = task.deadline
-    ? formatDistanceToNow(new Date(task.deadline))
-    : null;
-
+  const deadlineStr = task.deadline ? formatDistanceToNow(new Date(task.deadline)) : null;
   const isExpiringSoon = task.deadline
-    ? new Date(task.deadline).getTime() - Date.now() < 24 * 60 * 60 * 1000
-    : false;
+    ? new Date(task.deadline).getTime() - Date.now() < 24 * 60 * 60 * 1000 : false;
+
+  const handleInterested = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (loading || chatted) return;
+    setLoading(true);
+    try {
+      const chat = await expressInterest(task._id);
+      setChatted(true);
+      toast.success('Chat started! 🎉 Check your Chats tab.');
+      onInterested?.(chat._id);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to express interest.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const urgencyColor =
+    task.urgency === 'high' ? '#f87171' :
+    task.urgency === 'medium' ? '#fbbf24' : '#34d399';
 
   return (
     <article
-      className="cc-card group relative overflow-hidden p-4 space-y-3.5
-                 hover:border-primary/40 transition-all duration-200 cursor-pointer
-                 active:scale-[0.99]"
-      onClick={() => navigate(`/swap/${task._id}`)}
-      aria-label={`Task: ${task.title}`}
+      className="cc-card cc-card-hover p-4 space-y-3 relative overflow-hidden cursor-pointer"
+      onClick={() => navigate(`/tasks`)}
     >
-      {/* ── Urgency stripe ─────────────────────────────────────────────── */}
+      {/* Left urgency stripe */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-2xl transition-all duration-200
-                   group-hover:w-1"
-        style={{
-          background:
-            task.urgency === 'high'   ? '#f87171' :
-            task.urgency === 'medium' ? '#fbbf24' :
-                                        '#34d399',
-        }}
+        className="absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl"
+        style={{ background: urgencyColor }}
       />
 
-      {/* ── Header row ─────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-3 pl-2">
-        <div className="space-y-1.5 min-w-0">
-          {/* Category badge */}
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3 pl-3">
+        <div className="space-y-1.5 min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="inline-flex items-center gap-1 cc-tag">
-              <span className="text-[13px] leading-none">{CATEGORY_EMOJI[task.category]}</span>
-              <span>{CATEGORY_LABELS[task.category]}</span>
+            <span className="cc-tag">
+              {CATEGORY_EMOJI[task.category]} {CATEGORY_LABELS[task.category]}
             </span>
-            {/* Urgency pip */}
-            <span className={`inline-flex items-center gap-1 text-[11px] font-body font-medium ${urgency.color}`}>
-              {URGENCY_ICON[task.urgency]}
-              {urgency.label}
+            <span className="flex items-center gap-1 font-body text-[11px] font-medium"
+                  style={{ color: urgency.color }}>
+              {URGENCY_ICON[task.urgency]} {urgency.label}
             </span>
           </div>
-
-          {/* Title */}
-          <h3 className="font-display text-base font-700 text-text-main leading-snug
-                         line-clamp-2 group-hover:text-primary-light transition-colors duration-150">
+          <h3
+            className="font-display text-[15px] font-700 line-clamp-2 leading-snug"
+            style={{ color: 'var(--text)' }}
+          >
             {task.title}
           </h3>
         </div>
 
-        {/* Coin reward */}
+        {/* Coin reward badge */}
         <div
-          className="shrink-0 flex flex-col items-center justify-center px-3 py-2
-                     rounded-xl border transition-all duration-200"
+          className="shrink-0 flex flex-col items-center px-3 py-2 rounded-xl"
           style={{
-            background: 'rgba(57,255,20,0.06)',
-            borderColor: 'rgba(57,255,20,0.2)',
+            background: 'var(--accent-sub)',
+            border: '1px solid color-mix(in srgb, var(--accent) 25%, transparent)',
           }}
         >
-          <Zap size={13} className="text-neon" fill="currentColor" strokeWidth={0} />
-          <span className="font-mono text-base font-700 text-neon leading-tight mt-0.5"
-                style={{ textShadow: '0 0 8px rgba(57,255,20,0.5)' }}>
+          <Zap size={13} style={{ color: 'var(--accent)' }} fill="currentColor" strokeWidth={0} />
+          <span className="font-mono text-base font-700 leading-tight mt-0.5"
+                style={{ color: 'var(--accent)', textShadow: '0 0 8px var(--accent-glow)' }}>
             {task.coinReward.toLocaleString()}
           </span>
-          <span className="font-body text-[9px] text-text-dim uppercase tracking-wide">coins</span>
+          <span className="font-body text-[9px] uppercase tracking-wide" style={{ color: 'var(--text-dim)' }}>
+            coins
+          </span>
         </div>
       </div>
 
-      {/* ── Description ────────────────────────────────────────────────── */}
+      {/* Description */}
       {!compact && (
-        <p className="font-body text-sm text-text-muted leading-relaxed line-clamp-2 pl-2">
+        <p className="font-body text-sm leading-relaxed line-clamp-2 pl-3"
+           style={{ color: 'var(--text-muted)' }}>
           {task.description}
         </p>
       )}
 
-      {/* ── Tags ───────────────────────────────────────────────────────── */}
+      {/* Tags */}
       {task.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 pl-2">
+        <div className="flex flex-wrap gap-1.5 pl-3">
           {task.tags.slice(0, 4).map((tag) => (
             <span key={tag} className="cc-tag">{tag}</span>
           ))}
-          {task.tags.length > 4 && (
-            <span className="cc-tag text-text-dim">+{task.tags.length - 4}</span>
-          )}
         </div>
       )}
 
-      {/* ── Footer row ─────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-3 pl-2 pt-1"
+      {/* Footer */}
+      <div className="flex items-center justify-between gap-3 pl-3 pt-1"
            onClick={(e) => e.stopPropagation()}>
-
-        {/* Left: poster + meta */}
+        {/* Poster + meta */}
         <div className="flex items-center gap-2 min-w-0">
-          {/* Avatar */}
-          <div className="w-6 h-6 rounded-full overflow-hidden shrink-0
-                          border border-surface-border">
-            {task.poster.avatarUrl ? (
-              <img src={task.poster.avatarUrl} alt={task.poster.name}
-                   className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-primary/20">
-                <span className="font-display text-[10px] font-700 text-primary-light">
+          <div className="w-6 h-6 rounded-full overflow-hidden shrink-0"
+               style={{ border: '1px solid var(--border)' }}>
+            {task.poster.avatarUrl
+              ? <img src={task.poster.avatarUrl} alt="" className="w-full h-full object-cover" />
+              : <div className="w-full h-full flex items-center justify-center text-[8px] font-bold"
+                     style={{ background: 'rgba(124,58,237,0.2)', color: 'var(--primary-lt)' }}>
                   {task.poster.name.charAt(0)}
-                </span>
-              </div>
-            )}
+                </div>
+            }
           </div>
-
-          <div className="flex items-center gap-2 min-w-0 text-text-dim">
-            <span className="font-body text-xs truncate max-w-[90px]">{task.poster.name}</span>
-
-            {/* Divider */}
-            <span className="text-surface-border">·</span>
-
-            {/* Meta pills */}
-            <div className="flex items-center gap-2">
-              {task.applications.length > 0 && (
-                <span className="inline-flex items-center gap-1 text-[11px]">
-                  <Users size={11} /> {task.applications.length}
-                </span>
-              )}
-              {task.viewCount > 0 && (
-                <span className="inline-flex items-center gap-1 text-[11px]">
-                  <Eye size={11} /> {task.viewCount}
-                </span>
-              )}
-              {deadlineStr && (
-                <span className={`inline-flex items-center gap-1 text-[11px] ${
-                  isExpiringSoon ? 'text-red-400' : ''
-                }`}>
-                  <Clock size={11} /> {deadlineStr}
-                </span>
-              )}
-            </div>
+          <div className="flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--text-dim)' }}>
+            <span className="truncate max-w-[80px]">{task.poster.name}</span>
+            {task.applications.length > 0 && (
+              <><span style={{ color: 'var(--border)' }}>·</span>
+              <Users size={11} /> {task.applications.length}</>
+            )}
+            {task.viewCount > 0 && (
+              <><span style={{ color: 'var(--border)' }}>·</span>
+              <Eye size={11} /> {task.viewCount}</>
+            )}
+            {deadlineStr && (
+              <span className={`flex items-center gap-0.5 ${isExpiringSoon ? 'text-red-400' : ''}`}>
+                · <Clock size={11} /> {deadlineStr}
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Right: CTA */}
+        {/* CTA */}
         {!isOwnTask && task.status === 'open' && (
           <button
-            className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl
-                        text-xs font-body font-semibold transition-all duration-200
-                        active:scale-95 ${
-              hasApplied
-                ? 'bg-surface-elevated border border-surface-border text-text-muted'
-                : 'btn-neon'
-            }`}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!hasApplied) onApply?.(task);
-            }}
-            disabled={hasApplied}
-            aria-label={hasApplied ? 'Already applied' : 'Apply to task'}
+            onClick={handleInterested}
+            disabled={loading || chatted}
+            className={chatted ? 'btn-ghost text-xs px-3 py-1.5' : 'btn-interested'}
           >
-            {hasApplied ? (
-              'Applied ✓'
+            {loading ? (
+              <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : chatted ? (
+              <><MessageCircle size={13} /> Chatting</>
             ) : (
-              <>Accept Task <ArrowRight size={12} /></>
+              <>🔥 100% Interested</>
             )}
           </button>
         )}
 
         {isOwnTask && (
-          <span className="shrink-0 cc-tag text-primary-light border-primary/30">Your task</span>
+          <span className="cc-tag" style={{ color: 'var(--primary-lt)', borderColor: 'rgba(124,58,237,0.3)' }}>
+            Your task
+          </span>
         )}
       </div>
     </article>

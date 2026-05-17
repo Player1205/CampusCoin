@@ -27,7 +27,6 @@ export const useThemeStore = create<ThemeState>()(
   )
 );
 
-/** Call once in main.tsx to apply persisted theme on load */
 export const initTheme = () => {
   const stored = useThemeStore.getState().theme;
   document.documentElement.setAttribute('data-theme', stored);

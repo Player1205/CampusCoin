@@ -6,10 +6,10 @@ import { useCoinStore, selectBalance, selectIsAnimating } from '@/store/useCoinS
 import ThemeToggle from '@/components/ui/ThemeToggle';
 
 const PAGE_TITLES: Record<string, string> = {
-  '/':        'CampusCoin',
   '/home':    'Home',
   '/tasks':   'Tasks',
   '/flex':    'Flex',
+  '/chats':   'Chats',
   '/profile': 'Profile',
 };
 
@@ -17,29 +17,21 @@ function CoinBalance() {
   const balance     = useCoinStore(selectBalance);
   const isAnimating = useCoinStore(selectIsAnimating);
   const prevRef     = useRef(balance);
-  const wentUp      = balance >= prevRef.current;
   if (balance !== prevRef.current) prevRef.current = balance;
 
   return (
-    <div
-      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all duration-300"
-      style={{
-        background: isAnimating ? 'var(--accent-sub)' : 'var(--card)',
-        borderColor: isAnimating ? 'var(--accent)' : 'var(--border)',
-        boxShadow: isAnimating ? '0 0 10px var(--accent-glow)' : 'none',
-      }}
-    >
+    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all duration-300"
+         style={{
+           background:   isAnimating ? 'var(--accent-sub)' : 'var(--card)',
+           borderColor:  isAnimating ? 'var(--accent)'     : 'var(--border)',
+           boxShadow:    isAnimating ? '0 0 10px var(--accent-glow)' : 'none',
+         }}>
       <div className="w-5 h-5 rounded-full flex items-center justify-center"
            style={{ background: 'var(--accent-sub)' }}>
         <Zap size={11} style={{ color: 'var(--accent)' }} fill="currentColor" strokeWidth={0} />
       </div>
-      <span
-        className="font-mono text-sm font-semibold tabular-nums"
-        style={{
-          color: isAnimating ? (wentUp ? 'var(--accent)' : '#f87171') : 'var(--accent)',
-          textShadow: isAnimating ? '0 0 8px var(--accent-glow)' : 'none',
-        }}
-      >
+      <span className="font-mono text-sm font-700 tabular-nums"
+            style={{ color: 'var(--accent)', textShadow: isAnimating ? '0 0 8px var(--accent-glow)' : 'none' }}>
         {balance.toLocaleString()}
       </span>
     </div>
@@ -58,46 +50,38 @@ export default function TopBar() {
     >
       <div className="absolute inset-0 border-b glass" style={{ borderColor: 'var(--border)' }} />
 
-      {/* Left: logo + title */}
       <div className="relative flex items-center gap-2.5">
         <Link to="/home" className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-               style={{ background: 'var(--primary)', boxShadow: '0 0 12px rgba(124,58,237,0.5)' }}>
+               style={{ background: 'var(--primary)', boxShadow: '0 0 10px rgba(124,58,237,0.45)' }}>
             <span className="font-display text-xs font-800 text-white leading-none">CC</span>
           </div>
-          <span className="font-display text-base font-700" style={{ color: 'var(--text)' }}>
-            {title}
-          </span>
+          <span className="font-display text-base font-700" style={{ color: 'var(--text)' }}>{title}</span>
         </Link>
       </div>
 
-      {/* Right */}
       <div className="relative flex items-center gap-2">
         <CoinBalance />
         <ThemeToggle />
-        <button
-          className="relative w-9 h-9 rounded-xl flex items-center justify-center transition-colors active:scale-90"
-          style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
-          aria-label="Notifications"
-        >
+        <button className="relative w-9 h-9 rounded-xl flex items-center justify-center transition-colors active:scale-90"
+                style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
+                aria-label="Notifications">
           <Bell size={15} style={{ color: 'var(--text-muted)' }} />
           <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full"
                 style={{ background: 'var(--accent)', boxShadow: '0 0 4px var(--accent-glow)' }} />
         </button>
         {user && (
-          <Link to="/profile"
-                className="w-9 h-9 rounded-xl overflow-hidden transition-all active:scale-90"
+          <Link to="/profile" className="w-9 h-9 rounded-xl overflow-hidden transition-all active:scale-90"
                 style={{ border: '1px solid var(--border)' }}>
-            {user.avatarUrl ? (
-              <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center"
-                   style={{ background: 'rgba(124,58,237,0.2)' }}>
-                <span className="font-display text-sm font-700" style={{ color: 'var(--primary-lt)' }}>
-                  {user.name.charAt(0).toUpperCase()}
-                </span>
-              </div>
-            )}
+            {user.avatarUrl
+              ? <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
+              : <div className="w-full h-full flex items-center justify-center"
+                     style={{ background: 'rgba(124,58,237,0.2)' }}>
+                  <span className="font-display text-sm font-700" style={{ color: 'var(--primary-lt)' }}>
+                    {user.name.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+            }
           </Link>
         )}
       </div>
