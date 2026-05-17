@@ -135,7 +135,7 @@ export default function Profile() {
     setSavingBio(true);
     try {
       const res = await api.patch('/users/me', { bio: bioVal });
-      // @ts-expect-error unwrap
+
       const updated = res.data?.data?.user ?? res.data;
       updateUser({ bio: bioVal, ...updated });
       toast.success('Bio updated!');

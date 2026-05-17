@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Sparkles, X, Image as ImageIcon, Send, ChevronDown, Trash2 } from 'lucide-react';
+import { Sparkles, X, Image as ImageIcon, Send, ChevronDown } from 'lucide-react';
 import FeedPost, { FeedPostSkeleton } from '@/features/flex/components/FeedPost';
 import EmptyState from '@/components/ui/EmptyState';
 import { usePostFeed, usePostActions, useCreatePost } from '@/features/flex/hooks/useFlex';
@@ -60,7 +60,7 @@ function useImagePicker() {
 // ─── Inline post composer ─────────────────────────────────────────────────────
 
 function Composer({ onSubmit, isLoading }: {
-  onSubmit: (p: CreatePostPayload) => Promise<void>; isLoading: boolean;
+  onSubmit: (p: CreatePostPayload) => Promise<any>; isLoading: boolean;
 }) {
   const user                   = useAuthStore((s) => s.user);
   const [content, setContent]  = useState('');

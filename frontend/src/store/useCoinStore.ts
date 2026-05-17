@@ -26,10 +26,11 @@ interface CoinState {
 interface CoinActions {
   syncBalance: () => void;
   setBalance: (balance: number) => void;
-  optimisticDeduct: (amount: number, label: string) => void;
-  optimisticCredit: (amount: number, label: string) => void;
-  recordLock: (amount: number, label: string) => void;
-  recordUnlock: (amount: number, label: string) => void;
+  optimisticDeduct: (amount: number, label: string) => string;
+  optimisticCredit: (amount: number, label: string) => string;
+  recordLock: (amount: number, label: string) => string;
+  recordUnlock: (amount: number, label: string) => string;
+  rollbackTransaction: (txId: string) => void;
   triggerAnimation: () => void;
   sendCoins: (receiverId: string, amount: number) => Promise<void>;
 }
@@ -62,8 +63,9 @@ export const useCoinStore = create<CoinState & CoinActions>()(
     /** Optimistically deduct (e.g. task posted) */
     optimisticDeduct: (amount, label) => {
       const prev = get().balance;
+      const txId = crypto.randomUUID();
       const tx: CoinTransaction = {
-        id: crypto.randomUUID(),
+        id: txId,
         amount,
         direction: 'spent',
         label,
@@ -75,13 +77,15 @@ export const useCoinStore = create<CoinState & CoinActions>()(
       }));
       get().triggerAnimation();
       useAuthStore.getState().updateUser({ coinBalance: Math.max(0, prev - amount) });
+      return txId;
     },
 
     /** Optimistically credit (e.g. task completed) */
     optimisticCredit: (amount, label) => {
       const prev = get().balance;
+      const txId = crypto.randomUUID();
       const tx: CoinTransaction = {
-        id: crypto.randomUUID(),
+        id: txId,
         amount,
         direction: 'earned',
         label,
@@ -93,12 +97,14 @@ export const useCoinStore = create<CoinState & CoinActions>()(
       }));
       get().triggerAnimation();
       useAuthStore.getState().updateUser({ coinBalance: prev + amount });
+      return txId;
     },
 
     /** Record coins entering escrow */
     recordLock: (amount, label) => {
+      const txId = crypto.randomUUID();
       const tx: CoinTransaction = {
-        id: crypto.randomUUID(),
+        id: txId,
         amount,
         direction: 'locked',
         label,
@@ -108,12 +114,14 @@ export const useCoinStore = create<CoinState & CoinActions>()(
         lockedBalance: s.lockedBalance + amount,
         recentTransactions: [tx, ...s.recentTransactions].slice(0, 20),
       }));
+      return txId;
     },
 
     /** Record coins released from escrow */
     recordUnlock: (amount, label) => {
+      const txId = crypto.randomUUID();
       const tx: CoinTransaction = {
-        id: crypto.randomUUID(),
+        id: txId,
         amount,
         direction: 'refunded',
         label,
@@ -123,6 +131,32 @@ export const useCoinStore = create<CoinState & CoinActions>()(
         lockedBalance: Math.max(0, s.lockedBalance - amount),
         recentTransactions: [tx, ...s.recentTransactions].slice(0, 20),
       }));
+      return txId;
+    },
+
+    /** Rollback an optimistic transaction if API fails */
+    rollbackTransaction: (txId) => {
+      set((s) => {
+        const tx = s.recentTransactions.find((t) => t.id === txId);
+        if (!tx) return s;
+
+        let newBalance = s.balance;
+        let newLocked = s.lockedBalance;
+
+        if (tx.direction === 'spent') newBalance += tx.amount;
+        if (tx.direction === 'earned') newBalance -= tx.amount;
+        if (tx.direction === 'locked') newLocked -= tx.amount;
+        if (tx.direction === 'refunded') newLocked += tx.amount;
+
+        const newHistory = s.recentTransactions.filter((t) => t.id !== txId);
+        useAuthStore.getState().updateUser({ coinBalance: Math.max(0, newBalance) });
+
+        return {
+          balance: Math.max(0, newBalance),
+          lockedBalance: Math.max(0, newLocked),
+          recentTransactions: newHistory,
+        };
+      });
     },
 
     /** Pulse animation — called after any balance change */
@@ -149,14 +183,17 @@ export const useCoinStore = create<CoinState & CoinActions>()(
 
 // ─── Subscribe: keep coin balance in sync with auth user ─────────────────────
 
-useAuthStore.subscribe(
-  (state) => state.user?.coinBalance,
-  (coinBalance) => {
-    if (coinBalance !== undefined) {
-      useCoinStore.setState({ balance: coinBalance });
-    }
+useAuthStore.subscribe((state, prevState) => {
+  const newCoinBalance = state.user?.coinBalance;
+  if (newCoinBalance !== undefined && newCoinBalance !== prevState.user?.coinBalance) {
+    useCoinStore.setState({ balance: newCoinBalance });
   }
-);
+});
+
+// Eagerly sync the balance from the persisted auth store on module load.
+// The subscription above only fires on *changes*, so it misses the initial
+// hydrated value that is already present from localStorage.
+useCoinStore.getState().syncBalance();
 
 // ─── Selectors ────────────────────────────────────────────────────────────────
 

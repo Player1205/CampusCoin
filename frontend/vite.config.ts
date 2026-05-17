@@ -36,6 +36,8 @@ export default defineConfig({
       workbox: {
         // Cache static assets aggressively
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        navigateFallback: '/index.html',
+        navigateFallbackAllowlist: [/^(?!\/api)/],
         runtimeCaching: [
           {
             // Cache API responses for a short time
@@ -46,6 +48,9 @@ export default defineConfig({
               expiration: {
                 maxEntries: 50,
                 maxAgeSeconds: 60 * 5, // 5 minutes
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
               },
             },
           },

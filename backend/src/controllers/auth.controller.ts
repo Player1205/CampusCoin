@@ -61,6 +61,7 @@ export const logout = (_req: Request, res: Response): void => {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
+      path: '/',
     })
     .json({
       status: 'success',

@@ -67,7 +67,7 @@ export function useTaskFeed(initialFilters: TaskFilters = {}) {
 
 export function useTaskActions(onSuccess?: (task: Task) => void) {
   const [pending, setPending] = useState<Record<string, boolean>>({});
-  const { optimisticDeduct, optimisticCredit, recordLock, recordUnlock } = useCoinStore();
+  const { optimisticDeduct, optimisticCredit, recordLock, recordUnlock, rollbackTransaction } = useCoinStore();
 
   const run = useCallback(async (
     key: string,
@@ -117,17 +117,19 @@ export function useTaskActions(onSuccess?: (task: Task) => void) {
 
   const postTask = async (payload: Parameters<typeof swapApi.createTask>[0]) => {
     setPending((p) => ({ ...p, create: true }));
+    let txDeductId: string | undefined;
+    let txLockId: string | undefined;
     try {
-      optimisticDeduct(payload.coinReward, `Task posted: ${payload.title}`);
-      recordLock(payload.coinReward, `Escrow: ${payload.title}`);
+      txDeductId = optimisticDeduct(payload.coinReward, `Task posted: ${payload.title}`);
+      txLockId = recordLock(payload.coinReward, `Escrow: ${payload.title}`);
       const task = await swapApi.createTask(payload);
       toast.success('Task posted! Coins locked in escrow.');
       onSuccess?.(task);
       return task;
     } catch (err) {
-      // Rollback the optimistic deduction
-      optimisticCredit(payload.coinReward, 'Rollback: task creation failed');
-      recordUnlock(payload.coinReward, 'Rollback: task creation failed');
+      // Cleanly rollback the optimistic deduction without creating ledger entries
+      if (txDeductId) rollbackTransaction(txDeductId);
+      if (txLockId) rollbackTransaction(txLockId);
       toast.error(err instanceof Error ? err.message : 'Failed to post task.');
       throw err;
     } finally {

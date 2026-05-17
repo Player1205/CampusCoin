@@ -22,26 +22,27 @@ const coinError = (message: string, statusCode = 400): Error => {
 // ─── Service: Lock Coins (Escrow on task posting) ─────────────────────────────
 
 /**
- * Deducts `amount` from the poster's balance as escrow.
- * Runs inside an optional external session, or starts its own.
+ * Atomically deducts `amount` from the poster's balance as escrow.
+ * Uses findOneAndUpdate with a balance floor condition to prevent
+ * double-spend race conditions from concurrent requests.
  */
 export const lockCoinsForTask = async (
   userId: string,
   amount: number,
   session?: ClientSession
 ): Promise<number> => {
-  const user = await User.findById(userId).session(session ?? null);
+  const user = await User.findOneAndUpdate(
+    { _id: userId, coinBalance: { $gte: amount } },
+    { $inc: { coinBalance: -amount } },
+    { new: true, session: session ?? undefined }
+  );
 
-  if (!user) throw coinError('User not found.', 404);
-
-  if (user.coinBalance < amount) {
-    throw coinError(
-      `Insufficient balance. You have ${user.coinBalance} coins but this task requires ${amount}.`
-    );
+  if (!user) {
+    // Distinguish "not found" from "insufficient balance"
+    const exists = await User.exists({ _id: userId }).session(session ?? null);
+    if (!exists) throw coinError('User not found.', 404);
+    throw coinError('Insufficient balance for this operation.');
   }
-
-  user.coinBalance -= amount;
-  await user.save({ session: session ?? undefined, validateBeforeSave: false });
 
   return user.coinBalance;
 };
@@ -49,19 +50,21 @@ export const lockCoinsForTask = async (
 // ─── Service: Release Coins (Refund on cancellation) ─────────────────────────
 
 /**
- * Returns the locked escrow amount back to the poster.
+ * Atomically returns the locked escrow amount back to the poster.
+ * Uses findOneAndUpdate with $inc for atomic balance credit.
  */
 export const releaseCoinsToUser = async (
   userId: string,
   amount: number,
   session?: ClientSession
 ): Promise<number> => {
-  const user = await User.findById(userId).session(session ?? null);
+  const user = await User.findOneAndUpdate(
+    { _id: userId },
+    { $inc: { coinBalance: amount } },
+    { new: true, session: session ?? undefined }
+  );
 
   if (!user) throw coinError('User not found.', 404);
-
-  user.coinBalance += amount;
-  await user.save({ session: session ?? undefined, validateBeforeSave: false });
 
   return user.coinBalance;
 };

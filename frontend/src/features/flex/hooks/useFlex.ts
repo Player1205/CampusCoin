@@ -82,8 +82,11 @@ export function usePostActions(
     if (!currentUser) return;
     const userId = currentUser._id;
 
+    let prevPost: Post | undefined;
+
     // Optimistic update
     updatePost(postId, (p) => {
+      prevPost = p;
       const hasLiked = p.likes.includes(userId);
       return {
         ...p,
@@ -96,16 +99,10 @@ export function usePostActions(
     try {
       await flexApi.toggleLike(postId);
     } catch {
-      // Revert optimistic update
-      updatePost(postId, (p) => {
-        const hasLiked = p.likes.includes(userId);
-        return {
-          ...p,
-          likes: hasLiked
-            ? p.likes.filter((id) => id !== userId)
-            : [...p.likes, userId],
-        };
-      });
+      // Revert to exact previous state
+      if (prevPost) {
+        updatePost(postId, () => prevPost!);
+      }
       toast.error('Could not update like.');
     }
   }, [currentUser, updatePost]);

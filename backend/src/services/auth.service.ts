@@ -30,6 +30,7 @@ export const cookieOptions = {
   secure: process.env.NODE_ENV === 'production',
   sameSite: 'strict' as const,
   maxAge: COOKIE_MAX_AGE_MS,
+  path: '/',
 };
 
 // ─── Service: Register ────────────────────────────────────────────────────────

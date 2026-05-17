@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import Task, { ITask, TaskDocument } from '../models/Task';
 import {
   CreateTaskInput,
@@ -17,6 +17,10 @@ import {
 import { PaginatedResult, buildSortStage, makeAppError } from '../utils/service.helpers';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Escapes special regex characters to prevent ReDoS and injection via $regex. */
+const escapeRegex = (str: string): string =>
+  str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const taskNotFound = () => makeAppError('Task not found.', 404);
 const forbidden = (msg = 'You do not have permission to perform this action.') =>
@@ -53,10 +57,11 @@ export const listTasks = async (
   }
 
   if (search) {
+    const safeSearch = escapeRegex(search);
     filter.$or = [
-      { title: { $regex: search, $options: 'i' } },
-      { description: { $regex: search, $options: 'i' } },
-      { tags: { $regex: search, $options: 'i' } },
+      { title: { $regex: safeSearch, $options: 'i' } },
+      { description: { $regex: safeSearch, $options: 'i' } },
+      { tags: { $regex: safeSearch, $options: 'i' } },
     ];
   }
 
@@ -117,18 +122,35 @@ export const createTask = async (
   posterId: string,
   university: string
 ): Promise<TaskDocument> => {
-  // Lock coins in escrow before task is visible
-  await lockCoinsForTask(posterId, input.coinReward);
+  // Wrap escrow lock + task creation in a single transaction.
+  // If Task.create fails, the coin deduction is rolled back automatically.
+  const session = await mongoose.startSession();
+  try {
+    let task!: TaskDocument;
+    await session.withTransaction(async () => {
+      // Lock coins atomically within the session
+      await lockCoinsForTask(posterId, input.coinReward, session);
 
-  const task = await Task.create({
-    ...input,
-    deadline: input.deadline ? new Date(input.deadline) : undefined,
-    poster: posterId,
-    university,
-    status: 'open',
-  });
-
-  return task;
+      // Create the task within the same transaction
+      // Note: Task.create inside a session requires the array syntax in Mongoose 8+
+      const [created] = await Task.create(
+        [
+          {
+            ...input,
+            deadline: input.deadline ? new Date(input.deadline) : undefined,
+            poster: posterId,
+            university,
+            status: 'open',
+          },
+        ],
+        { session }
+      );
+      task = created;
+    });
+    return task;
+  } finally {
+    await session.endSession();
+  }
 };
 
 // ─── Service: Update Task ─────────────────────────────────────────────────────
@@ -161,12 +183,19 @@ export const cancelTask = async (taskId: string, requesterId: string): Promise<T
     throw makeAppError('This task cannot be cancelled in its current state.', 400);
   }
 
-  // Refund escrow to poster
-  await releaseCoinsToUser(requesterId, task.coinReward);
-
-  task.status = 'cancelled';
-  await task.save();
-  return task;
+  // Wrap refund + status change in a transaction.
+  // If task.save() fails, the coin refund is rolled back.
+  const session = await mongoose.startSession();
+  try {
+    await session.withTransaction(async () => {
+      await releaseCoinsToUser(requesterId, task.coinReward, session);
+      task.status = 'cancelled';
+      await task.save({ session });
+    });
+    return task;
+  } finally {
+    await session.endSession();
+  }
 };
 
 // ─── Service: Apply to Task ───────────────────────────────────────────────────

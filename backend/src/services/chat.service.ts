@@ -1,6 +1,6 @@
 import Chat, { IChat, ChatDocument } from '../models/Chat';
 import Task from '../models/Task';
-import { makeAppError, PaginatedResult } from '../utils/service.helpers';
+import { makeAppError } from '../utils/service.helpers';
 import { Types } from 'mongoose';
 
 // ── Express interest → create chat with default message ──────────────────────

@@ -25,7 +25,7 @@ api.interceptors.request.use(
 
 api.interceptors.response.use(
   (response: AxiosResponse) => response,
-  (error: AxiosError<{ status: string; message: string }>) => {
+  (error: AxiosError<{ status: string; message?: string; data?: any }>) => {
     const status = error.response?.status;
 
     // Token expired / invalid — redirect to login
@@ -38,10 +38,17 @@ api.interceptors.response.use(
       }
     }
 
-    // Bubble up the error with the server's message if available
-    const serverMessage = error.response?.data?.message;
-    if (serverMessage) {
-      error.message = serverMessage;
+    // Bubble up the error with the server's message or validation data
+    const resData = error.response?.data;
+    if (resData) {
+      if (resData.message) {
+        error.message = resData.message;
+      } else if (resData.data && typeof resData.data === 'object') {
+        const firstError = Object.values(resData.data)[0];
+        if (typeof firstError === 'string') {
+          error.message = firstError;
+        }
+      }
     }
 
     return Promise.reject(error);
@@ -50,8 +57,12 @@ api.interceptors.response.use(
 
 // ─── Typed helpers ────────────────────────────────────────────────────────────
 
-/** Extract `data.data` from a JSend success response */
-export const unwrap = <T>(response: AxiosResponse<{ status: string; data: T }>): T =>
-  response.data.data;
+/** Extract data from a JSend success response, throw if fail/error */
+export const unwrap = <T>(response: AxiosResponse<{ status: string; data?: T; message?: string }>): T => {
+  if (response.data.status === 'fail' || response.data.status === 'error') {
+    throw new Error(response.data.message || 'API request failed');
+  }
+  return response.data.data as T;
+};
 
 export default api;

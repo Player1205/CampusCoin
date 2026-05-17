@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { protect } from '../../middlewares/auth.middleware';
+import { validate } from '../../middlewares/validate.middleware';
+import { updateProfileSchema } from '../../validations/user.schema';
 import { getMe, updateMe } from '../../controllers/user.controller';
 
 const router = Router();
@@ -14,6 +16,6 @@ router.use(protect);
 router.get('/',  getMe);
 router.route('/me')
   .get(getMe)
-  .patch(updateMe);
+  .patch(validate(updateProfileSchema), updateMe);
 
 export default router;

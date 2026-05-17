@@ -92,10 +92,9 @@ function ApplyModal({ task, onClose, onApply }: {
 
 // ─── Desktop filter panel ─────────────────────────────────────────────────────
 
-function FilterPanel({ category, urgency, sortBy, onCat, onUrg, onSort, onReset, total }: {
+function FilterPanel({ category, urgency, sortBy, onCat, onSort, onReset, total }: {
   category: TaskCategory | ''; urgency: TaskUrgency | ''; sortBy: SortValue;
   onCat: (c: TaskCategory | '') => void;
-  onUrg: (u: TaskUrgency | '') => void;
   onSort: (s: SortValue) => void;
   onReset: () => void;
   total: number;
@@ -279,7 +278,7 @@ export default function Tasks() {
         <div className="flex gap-7">
           <FilterPanel
             category={category} urgency={urgency} sortBy={sortBy}
-            onCat={handleCat} onUrg={handleUrg} onSort={handleSort}
+            onCat={handleCat} onSort={handleSort}
             onReset={handleReset} total={pagination?.total ?? 0}
           />
 
@@ -304,7 +303,7 @@ export default function Tasks() {
               <>
                 <div className={`${viewMode === 'grid' ? 'grid grid-cols-1 xl:grid-cols-2 gap-3' : 'space-y-3'} animate-stagger`}>
                   {tasks.map((task) => (
-                    <TaskCard key={task._id} task={task} onApply={setApplyTarget} />
+                    <TaskCard key={task._id} task={task} />
                   ))}
                 </div>
                 {pagination?.hasNextPage && (
@@ -329,7 +328,7 @@ export default function Tasks() {
       {showPostModal && (
         <PostTaskModal
           onClose={() => setShowPostModal(false)}
-          onSubmit={postTask}
+          onSubmit={async (p) => { await postTask(p); }}
           isLoading={!!pending.create}
         />
       )}

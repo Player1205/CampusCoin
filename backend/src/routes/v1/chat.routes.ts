@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { protect } from '../../middlewares/auth.middleware';
+import { validate } from '../../middlewares/validate.middleware';
+import { sendMessageSchema, setAgreedPriceSchema } from '../../validations/chat.schema';
 import * as chatController from '../../controllers/chat.controller';
 
 const router = Router();
@@ -15,9 +17,9 @@ router.get('/', chatController.listMyChats);
 router.get('/:chatId', chatController.getChatById);
 
 // Send a message
-router.post('/:chatId/messages', chatController.sendMessage);
+router.post('/:chatId/messages', validate(sendMessageSchema), chatController.sendMessage);
 
 // Set agreed price
-router.patch('/:chatId/price', chatController.setAgreedPrice);
+router.patch('/:chatId/price', validate(setAgreedPriceSchema), chatController.setAgreedPrice);
 
 export default router;

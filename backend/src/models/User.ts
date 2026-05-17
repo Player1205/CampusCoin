@@ -65,9 +65,9 @@ userSchema.methods.comparePassword = async function (candidate: string): Promise
 };
 
 userSchema.methods.toSafeObject = function () {
-  const obj = this.toObject() as IUser & { password?: string };
-  delete obj.password;
-  return obj;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { password, ...safe } = this.toObject() as IUser & { password?: string };
+  return safe;
 };
 
 const User = mongoose.model<IUser, UserModel>('User', userSchema);

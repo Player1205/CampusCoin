@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+
 import {
   MessageCircle, Send, Zap, ArrowLeft,
   IndianRupee, ChevronRight, X, Check, Handshake,

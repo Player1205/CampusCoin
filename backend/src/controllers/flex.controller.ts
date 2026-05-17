@@ -109,7 +109,10 @@ export const deletePost = async (
       req.user!.role
     );
 
-    res.status(204).send();
+    res.status(200).json({
+      status: 'success',
+      data: null,
+    });
   } catch (err) {
     next(err);
   }
