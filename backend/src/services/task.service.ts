@@ -215,6 +215,9 @@ export const applyToTask = async (
   );
   if (alreadyApplied) throw makeAppError('You have already applied to this task.', 409);
 
+  // Deduct 2-coin application fee (anti-spam measure)
+  await lockCoinsForTask(applicantId, 2);
+
   task.applications.push({
     _id: new Types.ObjectId(),
     applicant: new Types.ObjectId(applicantId),
@@ -244,6 +247,10 @@ export const withdrawApplication = async (
 
   app.isWithdrawn = true;
   await task.save();
+
+  // Refund the 2-coin application fee
+  await releaseCoinsToUser(applicantId, 2);
+
   return task;
 };
 
@@ -302,8 +309,13 @@ export const completeTask = async (
   if (task.status !== 'submitted') throw makeAppError('You can only approve a submitted task.', 400);
   if (!task.doer) throw makeAppError('No doer assigned to this task.', 400);
 
-  // Transfer coins from escrow → doer (escrow already deducted at task creation)
-  await transferCoins(posterId, task.doer.toString(), task.coinReward);
+  const doerId = task.doer.toString();
+
+  // Transfer escrowed coins from poster → doer
+  await transferCoins(posterId, doerId, task.coinReward);
+
+  // Award +10 system bonus coins to the doer (completion bounty)
+  await releaseCoinsToUser(doerId, 10);
 
   task.status = 'completed';
   if (input.completionNote) task.completionNote = input.completionNote;

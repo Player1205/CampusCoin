@@ -8,20 +8,31 @@ import bcrypt from 'bcryptjs';
 
 export type UserRole = 'student' | 'admin';
 
+export interface IMilestoneRewards {
+  skills: boolean;
+  avatar: boolean;
+}
+
 export interface IUser {
   name: string;
   email: string;
   password: string;
   role: UserRole;
   avatarUrl?: string;
+  coverUrl?: string;
   university: string;
   department?: string;
   bio?: string;
   skills: string[];
   coinBalance: number;
   isVerified: boolean;
+  emailVerificationOtp?: string;
+  emailVerificationOtpExpires?: Date;
   isActive: boolean;
   lastLogin?: Date;
+  milestoneRewards: IMilestoneRewards;
+  dailyLikeCoinsEarned: number;
+  dailyLikeCoinsDate?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -41,12 +52,25 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>(
     password: { type: String, required: true, select: false },
     role: { type: String, enum: ['student', 'admin'], default: 'student' },
     avatarUrl: { type: String, default: '' },
+    coverUrl: { type: String, default: '' },
     university: { type: String, required: true },
     department: { type: String, default: '' },
     bio: { type: String, default: '' },
     skills: { type: [String], default: [] },
     coinBalance: { type: Number, default: 100, min: 0 },
+    milestoneRewards: {
+      type: {
+        skills: { type: Boolean, default: false },
+        avatar: { type: Boolean, default: false },
+      },
+      default: () => ({ skills: false, avatar: false }),
+      _id: false,
+    },
+    dailyLikeCoinsEarned: { type: Number, default: 0 },
+    dailyLikeCoinsDate: { type: Date },
     isVerified: { type: Boolean, default: false },
+    emailVerificationOtp: { type: String },
+    emailVerificationOtpExpires: { type: Date },
     isActive: { type: Boolean, default: true },
     lastLogin: { type: Date },
   },

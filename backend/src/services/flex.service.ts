@@ -181,21 +181,49 @@ export const deletePost = async (
 export const toggleLike = async (
   postId: string,
   userId: string
-): Promise<{ liked: boolean; likesCount: number }> => {
+): Promise<{ liked: boolean; likesCount: number; coinAwarded: boolean }> => {
   const post = await ensurePostExists(postId);
 
   const userObjectId = new Types.ObjectId(userId);
   const hasLiked = post.likes.some((id) => id.equals(userObjectId));
 
+  let coinAwarded = false;
+
   if (hasLiked) {
     post.likes = post.likes.filter((id) => !id.equals(userObjectId));
   } else {
     post.likes.push(userObjectId);
+
+    // Award +1 coin to post author (not the liker) — max 10/day
+    const authorId = post.author.toString();
+    if (authorId !== userId) {
+      const User = (await import('../models/User')).default;
+      const author = await User.findById(authorId);
+      if (author) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const lastDate = author.dailyLikeCoinsDate
+          ? new Date(author.dailyLikeCoinsDate)
+          : null;
+        const isNewDay = !lastDate || lastDate.getTime() < today.getTime();
+
+        const currentEarned = isNewDay ? 0 : author.dailyLikeCoinsEarned;
+
+        if (currentEarned < 10) {
+          await User.findByIdAndUpdate(authorId, {
+            $inc: { coinBalance: 1, dailyLikeCoinsEarned: isNewDay ? -author.dailyLikeCoinsEarned + 1 : 1 },
+            $set: { dailyLikeCoinsDate: new Date() },
+          });
+          coinAwarded = true;
+        }
+      }
+    }
   }
 
   await post.save();
 
-  return { liked: !hasLiked, likesCount: post.likes.length };
+  return { liked: !hasLiked, likesCount: post.likes.length, coinAwarded };
 };
 
 // ─── Service: Add Comment ─────────────────────────────────────────────────────

@@ -19,8 +19,21 @@ export const updateProfileSchema = z
 
     avatarUrl: z
       .string()
-      .url('Avatar must be a valid URL')
-      .max(2048, 'Avatar URL is too long')
+      .max(1_400_000, 'Avatar image is too large. Please use an image under 1 MB.')
+      .refine(
+        (val) => val === '' || val.startsWith('data:image/') || /^https?:\/\//.test(val),
+        'Avatar must be a valid URL or image upload'
+      )
+      .optional()
+      .or(z.literal('')),
+
+    coverUrl: z
+      .string()
+      .max(1_400_000, 'Cover image is too large. Please use an image under 1 MB.')
+      .refine(
+        (val) => val === '' || val.startsWith('data:image/') || /^https?:\/\//.test(val),
+        'Cover must be a valid URL or image upload'
+      )
       .optional()
       .or(z.literal('')),
 
@@ -39,6 +52,17 @@ export const updateProfileSchema = z
   })
   .strict(); // Reject unknown fields at the Zod layer
 
+export const verifyEmailSchema = z
+  .object({
+    otp: z
+      .string()
+      .length(6, 'OTP must be exactly 6 digits')
+      .regex(/^\d+$/, 'OTP must contain only numbers')
+      .trim(),
+  })
+  .strict();
+
 // ─── Inferred Types ───────────────────────────────────────────────────────────
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
