@@ -10,6 +10,7 @@ export interface User {
   email: string;
   role: 'student' | 'admin';
   avatarUrl?: string;
+  coverUrl?: string;
   university: string;
   department?: string;
   bio?: string;
