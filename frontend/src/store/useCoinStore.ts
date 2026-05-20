@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { subscribeWithSelector } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import api, { unwrap } from '@/lib/api';
 import { useAuthStore } from './useAuthStore';
 
@@ -38,7 +38,8 @@ interface CoinActions {
 // ─── Store ────────────────────────────────────────────────────────────────────
 
 export const useCoinStore = create<CoinState & CoinActions>()(
-  subscribeWithSelector((set, get) => ({
+  persist(
+    (set, get) => ({
     // ── State ──────────────────────────────────────────────────────────────
     balance: 0,
     lockedBalance: 0,
@@ -177,8 +178,16 @@ export const useCoinStore = create<CoinState & CoinActions>()(
       } finally {
         set({ isSyncing: false });
       }
-    },
-  }))
+    }
+  }),
+    {
+      name: 'coin-storage',
+      partialize: (state) => ({
+        recentTransactions: state.recentTransactions,
+        lockedBalance: state.lockedBalance,
+      }),
+    }
+  )
 );
 
 // ─── Subscribe: keep coin balance in sync with auth user ─────────────────────
