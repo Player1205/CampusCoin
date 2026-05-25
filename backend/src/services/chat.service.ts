@@ -134,11 +134,12 @@ export const setAgreedPrice = async (
   chat.messages.push({
     _id:      new Types.ObjectId(),
     sender:   new Types.ObjectId(userId),
-    content:  `💰 Price agreed: ${price} CampusCoins`,
+    content:  `💰 Price agreed: ₹${price}`,
     type:     'text',
     createdAt: new Date(),
   });
 
   await chat.save();
+  await chat.populate('messages.sender', 'name avatarUrl');
   return chat;
 };

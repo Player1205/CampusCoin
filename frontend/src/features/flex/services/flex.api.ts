@@ -27,9 +27,9 @@ export const deletePost = async (id: string): Promise<void> => {
   await api.delete(`/flex/posts/${id}`);
 };
 
-export const toggleLike = async (id: string): Promise<{ liked: boolean; likesCount: number }> => {
+export const toggleLike = async (id: string): Promise<{ liked: boolean; likesCount: number; coinAwarded?: boolean }> => {
   const res = await api.post(`/flex/posts/${id}/like`);
-  return unwrap<{ liked: boolean; likesCount: number }>(res);
+  return unwrap<{ liked: boolean; likesCount: number; coinAwarded?: boolean }>(res);
 };
 
 export const addComment = async (id: string, content: string): Promise<Post> => {

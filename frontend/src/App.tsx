@@ -60,7 +60,18 @@ export default function App() {
   const theme   = useThemeStore((s) => s.theme);
   const isDark  = theme === 'dark';
 
-  useEffect(() => { void fetchMe(); }, [fetchMe]);
+  useEffect(() => {
+    void fetchMe();
+
+    const handleUnauthorized = () => {
+      useAuthStore.getState().logout().then(() => {
+        window.location.href = '/login'; // Force full reload to clear all state
+      });
+    };
+
+    window.addEventListener('cc:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('cc:unauthorized', handleUnauthorized);
+  }, [fetchMe]);
 
   return (
     <>

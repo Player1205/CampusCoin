@@ -133,7 +133,7 @@ export const sendVerificationOtp = async (
 
     res.status(200).json({
       status: 'success',
-      message: 'Verification email sent. Please check your inbox.',
+      data: { message: 'Verification email sent. Please check your inbox.' },
     });
   } catch (err) {
     next(err);

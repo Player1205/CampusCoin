@@ -86,7 +86,7 @@ const sendVerificationOtp = async (req, res, next) => {
         await (0, email_service_1.sendVerificationEmail)(user.email, otp);
         res.status(200).json({
             status: 'success',
-            message: 'Verification email sent. Please check your inbox.',
+            data: { message: 'Verification email sent. Please check your inbox.' },
         });
     }
     catch (err) {

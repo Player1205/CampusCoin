@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import * as swapApi from '../services/swap.api';
 import type { Task, PaginatedTasks, TaskFilters } from '../types';
 import { useCoinStore } from '@/store/useCoinStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import toast from 'react-hot-toast';
 
 // ─── useTaskFeed ──────────────────────────────────────────────────────────────
@@ -68,6 +69,7 @@ export function useTaskFeed(initialFilters: TaskFilters = {}) {
 export function useTaskActions(onSuccess?: (task: Task) => void) {
   const [pending, setPending] = useState<Record<string, boolean>>({});
   const { optimisticDeduct, optimisticCredit, recordLock, recordUnlock, rollbackTransaction } = useCoinStore();
+  const fetchMe = useAuthStore((s) => s.fetchMe);
 
   const run = useCallback(async (
     key: string,
@@ -89,10 +91,24 @@ export function useTaskActions(onSuccess?: (task: Task) => void) {
   }, [onSuccess]);
 
   const apply = (taskId: string, message: string) =>
-    run(`apply-${taskId}`, () => swapApi.applyToTask(taskId, { message }), 'Application sent!');
+    run(`apply-${taskId}`, async () => {
+      let txDeductId: string | undefined;
+      try {
+        txDeductId = optimisticDeduct(2, 'Task application fee');
+        const task = await swapApi.applyToTask(taskId, { message });
+        return task;
+      } catch (err) {
+        if (txDeductId) rollbackTransaction(txDeductId);
+        throw err;
+      }
+    }, 'Application sent!');
 
   const withdraw = (taskId: string) =>
-    run(`withdraw-${taskId}`, () => swapApi.withdrawApplication(taskId), 'Application withdrawn.');
+    run(`withdraw-${taskId}`, async () => {
+      const task = await swapApi.withdrawApplication(taskId);
+      optimisticCredit(2, 'Application fee refunded');
+      return task;
+    }, 'Application withdrawn.');
 
   const cancel = (taskId: string, coinReward: number) =>
     run(`cancel-${taskId}`, async () => {
@@ -112,6 +128,8 @@ export function useTaskActions(onSuccess?: (task: Task) => void) {
     run(`complete-${taskId}`, async () => {
       const task = await swapApi.completeTask(taskId, { completionNote: note });
       toast.success(`🎉 ${coinReward} coins sent to doer!`);
+      // Sync fresh balance from server for the poster (to remove the escrow record)
+      await fetchMe();
       return task;
     }, 'Task completed!');
 

@@ -12,6 +12,7 @@ import { useTaskFeed } from '@/features/swap/hooks/useSwap';
 import type { CoinTransaction } from '@/store/useCoinStore';
 import CoinsExplainer from '@/pages/CoinsExplainer';
 import EmailVerificationModal from '@/features/profile/components/EmailVerificationModal';
+import SendCoinsModal from '@/features/profile/components/SendCoinsModal';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 
@@ -122,6 +123,7 @@ export default function Profile() {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [showCoins,   setShowCoins]   = useState(false);       // ← CoinsExplainer toggle
   const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [showSendCoinsModal, setShowSendCoinsModal] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -370,7 +372,7 @@ export default function Profile() {
                     <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
                     <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverChange} />
 
-                    <button className="btn-ghost text-xs px-3 py-1.5 flex items-center gap-1.5">
+                    <button onClick={() => { setEditingBio(true); setBioVal(user.bio ?? ''); }} className="btn-ghost text-xs px-3 py-1.5 flex items-center gap-1.5">
                       <Settings size={12} /> Edit
                     </button>
                   </div>
@@ -521,7 +523,7 @@ export default function Profile() {
                 )}
 
                 <button
-                  onClick={(e) => { e.stopPropagation(); }}
+                  onClick={(e) => { e.stopPropagation(); setShowSendCoinsModal(true); }}
                   className="btn-neon w-full"
                 >
                   Send Coins
@@ -632,6 +634,7 @@ export default function Profile() {
       {/* ── Coins explainer overlay ─────────────────────────────────── */}
       {showCoins && <CoinsExplainer onClose={() => setShowCoins(false)} />}
       {showVerifyModal && <EmailVerificationModal onClose={() => setShowVerifyModal(false)} />}
+      {showSendCoinsModal && <SendCoinsModal onClose={() => setShowSendCoinsModal(false)} />}
     </>
   );
 }

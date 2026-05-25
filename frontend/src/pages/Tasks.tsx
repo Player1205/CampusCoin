@@ -7,7 +7,7 @@ import TaskCard, { TaskCardSkeleton } from '@/features/swap/components/TaskCard'
 import PostTaskModal from '@/features/swap/components/PostTaskModal';
 import EmptyState from '@/components/ui/EmptyState';
 import { useTaskFeed, useTaskActions } from '@/features/swap/hooks/useSwap';
-import type { Task, TaskCategory, TaskUrgency } from '@/features/swap/types';
+import type { TaskCategory, TaskUrgency } from '@/features/swap/types';
 import { CATEGORY_LABELS, CATEGORY_EMOJI } from '@/features/swap/types';
 
 type SortValue = 'newest' | 'oldest' | 'reward_high' | 'reward_low';
@@ -19,76 +19,6 @@ const URGENCY_TABS = [
   { value: 'medium', label: '🟡 Medium', dot: '#fbbf24' },
   { value: 'low',    label: '🟢 Low',    dot: '#34d399' },
 ];
-
-// ─── Apply modal ──────────────────────────────────────────────────────────────
-
-function ApplyModal({ task, onClose, onApply }: {
-  task: Task; onClose: () => void; onApply: (msg: string) => Promise<void>;
-}) {
-  const [msg, setMsg]       = useState('');
-  const [loading, setLoad]  = useState(false);
-
-  const handle = async () => {
-    if (msg.trim().length < 10) return;
-    setLoad(true);
-    try { await onApply(msg); onClose(); }
-    finally { setLoad(false); }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center p-0 lg:p-4"
-         onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="absolute inset-0 backdrop-blur-sm" style={{ background: 'var(--overlay)' }} onClick={onClose} />
-      <div className="relative w-full lg:max-w-md rounded-t-3xl lg:rounded-3xl p-6 space-y-5 animate-slide-up lg:animate-fade-up"
-           style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-        <div className="flex items-center justify-between">
-          <h3 className="font-display text-xl font-700" style={{ color: 'var(--text)' }}>Apply to Task</h3>
-          <button onClick={onClose} className="btn-ghost !px-2 !py-2"><X size={16} /></button>
-        </div>
-        <div className="rounded-xl p-3 space-y-1.5"
-             style={{ background: 'var(--card-alt)', border: '1px solid var(--border)' }}>
-          <p className="font-display text-sm font-700 line-clamp-2" style={{ color: 'var(--text)' }}>
-            {task.title}
-          </p>
-          <div className="flex items-center gap-1.5">
-            <Zap size={12} style={{ color: 'var(--accent)' }} fill="currentColor" strokeWidth={0} />
-            <span className="font-mono text-sm font-700" style={{ color: 'var(--accent)' }}>
-              {task.coinReward} coins
-            </span>
-          </div>
-        </div>
-        <div className="space-y-1.5">
-          <label className="font-body text-xs font-semibold uppercase tracking-wider"
-                 style={{ color: 'var(--text-muted)' }}>
-            Your pitch <span className="normal-case font-normal" style={{ color: 'var(--text-dim)' }}>(min 10 chars)</span>
-          </label>
-          <textarea
-            autoFocus
-            className="cc-input min-h-[110px] resize-none"
-            placeholder="Why are you the best person? What's your approach?"
-            value={msg}
-            onChange={(e) => setMsg(e.target.value)}
-            maxLength={500}
-          />
-          <p className="text-right font-mono text-[11px]" style={{ color: 'var(--text-dim)' }}>
-            {msg.length}/500
-          </p>
-        </div>
-        <button
-          onClick={handle}
-          disabled={msg.trim().length < 10 || loading}
-          className="btn-neon w-full"
-        >
-          {loading
-            ? <><span className="w-4 h-4 border-2 rounded-full animate-spin"
-                      style={{ borderColor: 'rgba(0,0,0,0.2)', borderTopColor: '#0F172A' }} /> Sending…</>
-            : <>Accept Task — Apply Now</>
-          }
-        </button>
-      </div>
-    </div>
-  );
-}
 
 // ─── Desktop filter panel ─────────────────────────────────────────────────────
 
@@ -176,13 +106,12 @@ export default function Tasks() {
   const [sortBy,        setSortBy]        = useState<SortValue>('reward_high'); // high reward first
   const [viewMode,      setViewMode]      = useState<ViewMode>('list');
   const [showPostModal, setShowPostModal] = useState(false);
-  const [applyTarget,   setApplyTarget]   = useState<Task | null>(null);
   const searchTimeout                     = useRef<ReturnType<typeof setTimeout>>();
 
   const { tasks, pagination, isLoading, isLoadingMore, error, applyFilters, loadNextPage } =
     useTaskFeed({ sortBy: 'reward_high', status: 'open' });
 
-  const { pending, apply, postTask } = useTaskActions(() => applyFilters({}));
+  const { pending, postTask } = useTaskActions(() => applyFilters({}));
 
   const handleSearch = useCallback((val: string) => {
     setSearch(val);
@@ -330,13 +259,6 @@ export default function Tasks() {
           onClose={() => setShowPostModal(false)}
           onSubmit={async (p) => { await postTask(p); }}
           isLoading={!!pending.create}
-        />
-      )}
-      {applyTarget && (
-        <ApplyModal
-          task={applyTarget}
-          onClose={() => setApplyTarget(null)}
-          onApply={(msg) => apply(applyTarget._id, msg).then(() => setApplyTarget(null))}
         />
       )}
     </div>

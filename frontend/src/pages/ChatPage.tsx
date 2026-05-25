@@ -12,16 +12,17 @@ import { formatDistanceToNow } from '@/utils/time';
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
-function Av({ name, url, size = 'md' }: { name: string; url?: string; size?: 'sm' | 'md' | 'lg' }) {
+function Av({ name, url, size = 'md' }: { name?: string; url?: string; size?: 'sm' | 'md' | 'lg' }) {
   const dim = { sm: 'w-8 h-8 text-xs', md: 'w-10 h-10 text-sm', lg: 'w-12 h-12 text-base' }[size];
+  const safeName = name || '?';
   return (
     <div className={`${dim} rounded-xl overflow-hidden shrink-0`}
          style={{ border: '1px solid var(--border)' }}>
       {url
-        ? <img src={url} alt={name} className="w-full h-full object-cover" />
+        ? <img src={url} alt={safeName} className="w-full h-full object-cover" />
         : <div className="w-full h-full flex items-center justify-center font-display font-700"
                style={{ background: 'rgba(124,58,237,0.2)', color: 'var(--primary-lt)' }}>
-            {name.charAt(0).toUpperCase()}
+            {safeName.charAt(0).toUpperCase()}
           </div>
       }
     </div>
@@ -76,7 +77,7 @@ function PaymentModal({ chat, onClose, onSend }: {
               </div>
               {chat.agreedPrice && (
                 <p className="font-body text-xs" style={{ color: 'var(--text-dim)' }}>
-                  Agreed: {chat.agreedPrice} coins ≈ ₹{chat.agreedPrice}
+                  Agreed: ₹{chat.agreedPrice}
                 </p>
               )}
             </div>
@@ -183,7 +184,10 @@ function ChatRoom({ chatId, onBack }: { chatId: string; onBack: () => void }) {
 
   if (!chat) return <div className="flex-1 flex items-center justify-center"><p style={{ color: 'var(--text-muted)' }}>Chat not found.</p></div>;
 
-  const isMe = (senderId: string) => senderId === currentUser?._id;
+  const isMe = (sender: any) => {
+    const id = typeof sender === 'string' ? sender : sender?._id;
+    return id === currentUser?._id;
+  };
   const otherUser = chat.poster._id === currentUser?._id ? chat.doer : chat.poster;
   const amIPoster = chat.poster._id === currentUser?._id;
 
@@ -194,13 +198,6 @@ function ChatRoom({ chatId, onBack }: { chatId: string; onBack: () => void }) {
   };
 
   const handlePayment = async (method: UPIMethodId, amount: number) => {
-    // Log the payment in chat
-    await sendMessage(
-      `💸 Payment of ₹${amount} sent via ${UPI_METHODS.find((m) => m.id === method)?.label}`,
-      'payment_sent',
-      amount,
-      method,
-    );
     // Deep link to UPI app
     const upiLinks: Record<string, string> = {
       phonepe:   `phonepe://pay?pa=upi@ybl&pn=${chat.poster.name}&am=${amount}&cu=INR`,
@@ -267,17 +264,19 @@ function ChatRoom({ chatId, onBack }: { chatId: string; onBack: () => void }) {
           </div>
 
           {/* Negotiate price */}
-          <button
-            onClick={() => setShowPriceBar((v) => !v)}
-            className="ml-auto font-body text-[11px] px-2.5 py-1 rounded-lg transition-all active:scale-95"
-            style={{
-              background: 'rgba(124,58,237,0.1)',
-              border: '1px solid rgba(124,58,237,0.25)',
-              color: 'var(--primary-lt)',
-            }}
-          >
-            💬 Negotiate
-          </button>
+          {amIPoster && (
+            <button
+              onClick={() => setShowPriceBar((v) => !v)}
+              className="ml-auto font-body text-[11px] px-2.5 py-1 rounded-lg transition-all active:scale-95"
+              style={{
+                background: 'rgba(124,58,237,0.1)',
+                border: '1px solid rgba(124,58,237,0.25)',
+                color: 'var(--primary-lt)',
+              }}
+            >
+              💬 Negotiate
+            </button>
+          )}
         </div>
 
         {/* Negotiate price bar */}
@@ -287,7 +286,7 @@ function ChatRoom({ chatId, onBack }: { chatId: string; onBack: () => void }) {
               type="number"
               value={priceInput}
               onChange={(e) => setPriceInput(e.target.value)}
-              placeholder="Propose price in coins"
+              placeholder="Propose price in ₹"
               className="cc-input !py-1.5 text-sm flex-1"
               min={1}
             />
@@ -317,7 +316,7 @@ function ChatRoom({ chatId, onBack }: { chatId: string; onBack: () => void }) {
         )}
 
         {chat.messages.map((msg) => {
-          const mine = isMe(msg.sender._id);
+          const mine = isMe(msg.sender);
           const isPayment = msg.type === 'payment_sent' || msg.type === 'payment_request';
 
           return (

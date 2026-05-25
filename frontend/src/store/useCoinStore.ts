@@ -172,8 +172,17 @@ export const useCoinStore = create<CoinState & CoinActions>()(
       try {
         const res = await api.post('/users/send-coins', { receiverId, amount });
         const { fromBalance } = unwrap<{ fromBalance: number; toBalance: number }>(res);
+        const tx: CoinTransaction = {
+          id: crypto.randomUUID(),
+          amount,
+          direction: 'spent',
+          label: `Sent coins`,
+          timestamp: new Date().toISOString(),
+        };
+        set((s) => ({
+          recentTransactions: [tx, ...s.recentTransactions].slice(0, 20),
+        }));
         get().setBalance(fromBalance);
-        get().optimisticDeduct(0, `Sent ${amount} coins`); // balance already set, just log
         get().triggerAnimation();
       } finally {
         set({ isSyncing: false });

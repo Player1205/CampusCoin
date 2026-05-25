@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import * as flexApi from '../services/flex.api';
 import type { Post, PostFilters, PaginatedPosts, CreatePostPayload } from '../types';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useCoinStore } from '@/store/useCoinStore';
 import toast from 'react-hot-toast';
 
 // ─── usePostFeed ──────────────────────────────────────────────────────────────
@@ -77,6 +78,7 @@ export function usePostActions(
   removePost?: (id: string) => void,
 ) {
   const currentUser = useAuthStore((s) => s.user);
+  const optimisticCredit = useCoinStore((s) => s.optimisticCredit);
 
   const toggleLike = useCallback(async (postId: string) => {
     if (!currentUser) return;
@@ -97,7 +99,11 @@ export function usePostActions(
     });
 
     try {
-      await flexApi.toggleLike(postId);
+      const res = await flexApi.toggleLike(postId);
+      if (res.coinAwarded) {
+        optimisticCredit(1, 'Coin for getting a like!');
+        toast.success('🎉 You earned a coin for a like!', { id: 'like-coin', duration: 2000 });
+      }
     } catch {
       // Revert to exact previous state
       if (prevPost) {
@@ -105,7 +111,7 @@ export function usePostActions(
       }
       toast.error('Could not update like.');
     }
-  }, [currentUser, updatePost]);
+  }, [currentUser, updatePost, optimisticCredit]);
 
   const addComment = useCallback(async (postId: string, content: string) => {
     try {

@@ -45,7 +45,7 @@ export default function PostTaskModal({ onClose, onSubmit, isLoading }: PostTask
     e.preventDefault();
     setError(null);
     if (form.coinReward > balance) {
-      setError(`You only have ${balance} coins. Lower the reward.`);
+      setError(`You need at least ${form.coinReward} coins to post a task. You have ${balance}.`);
       return;
     }
     try {
@@ -63,9 +63,9 @@ export default function PostTaskModal({ onClose, onSubmit, isLoading }: PostTask
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* Sheet */}
-      <div className="relative w-full sm:max-w-lg bg-surface-card border border-surface-border
-                      rounded-t-3xl sm:rounded-3xl overflow-hidden animate-slide-up
-                      max-h-[92dvh] flex flex-col">
+      <div className="relative w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl overflow-hidden animate-slide-up
+                      max-h-[92dvh] flex flex-col"
+           style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-surface-border">
@@ -139,36 +139,18 @@ export default function PostTaskModal({ onClose, onSubmit, isLoading }: PostTask
               </div>
             </div>
 
-            {/* Urgency + Reward row */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="font-body text-xs font-semibold text-text-muted uppercase tracking-wider">
-                  Urgency
-                </label>
-                <select className="cc-input appearance-none"
-                        value={form.urgency}
-                        onChange={(e) => set('urgency', e.target.value as TaskUrgency)}>
-                  <option value="low">🟢 Low</option>
-                  <option value="medium">🟡 Medium</option>
-                  <option value="high">🔴 High</option>
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="font-body text-xs font-semibold text-text-muted uppercase tracking-wider">
-                  Coin Reward *
-                </label>
-                <div className="relative">
-                  <Zap size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neon" />
-                  <input type="number" className="cc-input pl-8" required
-                         min={5} max={5000} step={5}
-                         value={form.coinReward}
-                         onChange={(e) => set('coinReward', Number(e.target.value))} />
-                </div>
-                <p className="font-body text-[11px] text-text-dim">
-                  Balance: <span className="text-neon">{balance}</span>
-                </p>
-              </div>
+            {/* Urgency */}
+            <div className="space-y-1.5">
+              <label className="font-body text-xs font-semibold text-text-muted uppercase tracking-wider">
+                Urgency
+              </label>
+              <select className="cc-input appearance-none"
+                      value={form.urgency}
+                      onChange={(e) => set('urgency', e.target.value as TaskUrgency)}>
+                <option value="low">🟢 Low</option>
+                <option value="medium">🟡 Medium</option>
+                <option value="high">🔴 High</option>
+              </select>
             </div>
 
             {/* Deadline */}

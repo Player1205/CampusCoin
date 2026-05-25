@@ -145,7 +145,7 @@ export default function Sidebar() {
           </div>
         </div>
         {[
-          { icon: Settings, label: 'Settings', color: 'var(--text-dim)', onClick: () => {} },
+          { icon: Settings, label: 'Settings', color: 'var(--text-dim)', onClick: () => navigate('/profile') },
           { icon: LogOut,   label: 'Sign out',  color: 'var(--danger)',   onClick: handleLogout },
         ].map(({ icon: Icon, label, color, onClick }) => (
           <button

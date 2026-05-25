@@ -32,7 +32,7 @@ export default function RegisterPage() {
     try {
       await register(form);
       toast.success(`Welcome to CampusCoin! You received 100 starter coins 🎉`);
-      navigate('/swap', { replace: true });
+      navigate('/home', { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed.');
     }

@@ -109,11 +109,12 @@ const setAgreedPrice = async (chatId, userId, price) => {
     chat.messages.push({
         _id: new mongoose_1.Types.ObjectId(),
         sender: new mongoose_1.Types.ObjectId(userId),
-        content: `💰 Price agreed: ${price} CampusCoins`,
+        content: `💰 Price agreed: ₹${price}`,
         type: 'text',
         createdAt: new Date(),
     });
     await chat.save();
+    await chat.populate('messages.sender', 'name avatarUrl');
     return chat;
 };
 exports.setAgreedPrice = setAgreedPrice;
