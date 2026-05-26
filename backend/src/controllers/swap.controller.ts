@@ -21,7 +21,8 @@ export const listTasks = async (
   try {
     const result = await taskService.listTasks(
       req.query as unknown as TaskQueryInput,
-      req.user!.university
+      req.user!.university,
+      req.user!._id.toString()
     );
 
     res.status(200).json({

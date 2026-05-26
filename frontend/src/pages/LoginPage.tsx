@@ -41,7 +41,7 @@ export default function LoginPage() {
             <Zap size={28} className="text-white" fill="white" strokeWidth={0} />
           </div>
           <div className="text-center">
-            <h1 className="font-display text-2xl font-800 text-text-main">Welcome back</h1>
+            <h1 className="font-display text-2xl font-800" style={{ color: 'var(--text)' }}>Welcome back</h1>
             <p className="font-body text-sm text-text-muted mt-1">Sign in to your CampusCoin account</p>
           </div>
         </div>

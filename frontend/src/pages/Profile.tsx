@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useCoinStore, selectBalance, selectLockedBalance, selectRecentTransactions } from '@/store/useCoinStore';
 import TaskCard, { TaskCardSkeleton } from '@/features/swap/components/TaskCard';
-import { useTaskFeed } from '@/features/swap/hooks/useSwap';
+import { useMyTasks } from '@/features/swap/hooks/useSwap';
 import type { CoinTransaction } from '@/store/useCoinStore';
 import CoinsExplainer from '@/pages/CoinsExplainer';
 import EmailVerificationModal from '@/features/profile/components/EmailVerificationModal';
@@ -134,7 +134,7 @@ export default function Profile() {
     pagination,
     loadNextPage,
     isLoadingMore,
-  } = useTaskFeed({ limit: 10 });
+  } = useMyTasks(taskRole);
 
   const handleLogout = async () => {
     await logout();

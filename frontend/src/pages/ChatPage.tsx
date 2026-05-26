@@ -2,13 +2,15 @@ import { useState } from 'react';
 
 import {
   MessageCircle, Send, Zap, ArrowLeft,
-  IndianRupee, ChevronRight, X, Check, Handshake,
+  IndianRupee, ChevronRight, X, Check, Handshake, CheckCircle2,
 } from 'lucide-react';
 import { useChatList, useChatRoom } from '@/features/chat/hooks/useChat';
 import type { Chat, UPIMethodId } from '@/features/chat/types';
 import { UPI_METHODS } from '@/features/chat/types';
+import { submitTask as apiSubmitTask, completeTask as apiCompleteTask, assignDoer as apiAssignDoer } from '@/features/swap/services/swap.api';
 import { useAuthStore } from '@/store/useAuthStore';
 import { formatDistanceToNow } from '@/utils/time';
+import toast from 'react-hot-toast';
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
@@ -172,6 +174,7 @@ function ChatRoom({ chatId, onBack }: { chatId: string; onBack: () => void }) {
   const [showPayment, setShowPayment] = useState(false);
   const [priceInput,  setPriceInput]  = useState('');
   const [showPriceBar, setShowPriceBar] = useState(false);
+  const [lifecycleLoading, setLifecycleLoading] = useState(false);
 
   if (isLoading) {
     return (
@@ -198,14 +201,25 @@ function ChatRoom({ chatId, onBack }: { chatId: string; onBack: () => void }) {
   };
 
   const handlePayment = async (method: UPIMethodId, amount: number) => {
+    // Complete the task on the backend before redirecting
+    try {
+      await apiCompleteTask(chat.task._id, {});
+      toast.success('Task approved!');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to complete task.');
+      return;
+    }
+
     // Deep link to UPI app
+    // We send payment to the Doer
+    const payeeName = amIPoster ? chat.doer.name : chat.poster.name;
     const upiLinks: Record<string, string> = {
-      phonepe:   `phonepe://pay?pa=upi@ybl&pn=${chat.poster.name}&am=${amount}&cu=INR`,
-      gpay:      `tez://upi/pay?pa=upi@oksbi&pn=${chat.poster.name}&am=${amount}&cu=INR`,
-      bhim:      `upi://pay?pa=upi@upi&pn=${chat.poster.name}&am=${amount}&cu=INR`,
-      paytm:     `paytmmp://upi/pay?pa=paytm@paytm&pn=${chat.poster.name}&am=${amount}&cu=INR`,
-      mobikwik:  `mobikwik://upi?pa=upi@okaxis&pn=${chat.poster.name}&am=${amount}`,
-      amazonpay: `amazonpay://upi?pa=upi@apl&pn=${chat.poster.name}&am=${amount}`,
+      phonepe:   `phonepe://pay?pa=upi@ybl&pn=${payeeName}&am=${amount}&cu=INR`,
+      gpay:      `tez://upi/pay?pa=upi@oksbi&pn=${payeeName}&am=${amount}&cu=INR`,
+      bhim:      `upi://pay?pa=upi@upi&pn=${payeeName}&am=${amount}&cu=INR`,
+      paytm:     `paytmmp://upi/pay?pa=paytm@paytm&pn=${payeeName}&am=${amount}&cu=INR`,
+      mobikwik:  `mobikwik://upi?pa=upi@okaxis&pn=${payeeName}&am=${amount}`,
+      amazonpay: `amazonpay://upi?pa=upi@apl&pn=${payeeName}&am=${amount}`,
     };
     window.location.href = upiLinks[method] ?? `upi://pay?pa=upi@upi&am=${amount}&cu=INR`;
   };
@@ -240,12 +254,6 @@ function ChatRoom({ chatId, onBack }: { chatId: string; onBack: () => void }) {
           </div>
         )}
 
-        {/* Pay button (doer pays poster after work) */}
-        {!amIPoster && (
-          <button onClick={() => setShowPayment(true)} className="btn-neon text-xs px-3 py-1.5">
-            <IndianRupee size={13} /> Pay
-          </button>
-        )}
       </div>
 
       {/* Task summary banner */}
@@ -304,6 +312,120 @@ function ChatRoom({ chatId, onBack }: { chatId: string; onBack: () => void }) {
             </button>
           </div>
         )}
+
+        {/* Task lifecycle actions */}
+        <div className="flex items-center gap-2 mt-2">
+          {/* Poster: Assign Task */}
+          {amIPoster && chat.task.status === 'open' && (
+            <button
+              disabled={lifecycleLoading}
+              onClick={async () => {
+                setLifecycleLoading(true);
+                try {
+                  await apiAssignDoer(chat.task._id, chat.doer._id);
+                  toast.success('Task assigned to this user! 🚀');
+                  window.location.reload();
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : 'Failed to assign.');
+                } finally {
+                  setLifecycleLoading(false);
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-body text-xs font-semibold transition-all active:scale-95"
+              style={{
+                background: 'rgba(124,58,237,0.12)',
+                border: '1px solid rgba(124,58,237,0.3)',
+                color: 'var(--primary-lt)',
+              }}
+            >
+              {lifecycleLoading
+                ? <span className="w-3.5 h-3.5 border-2 border-purple-300/30 border-t-purple-400 rounded-full animate-spin" />
+                : <><CheckCircle2 size={13} /> Assign Task</>
+              }
+            </button>
+          )}
+
+          {/* Doer: Mark work as done */}
+          {!amIPoster && ['in_progress', 'submitted'].includes(chat.task.status) && (
+            <button
+              disabled={lifecycleLoading}
+              onClick={async () => {
+                setLifecycleLoading(true);
+                try {
+                  await apiSubmitTask(chat.task._id, { submissionNote: 'Work completed.' });
+                  toast.success('Work submitted for review! ✅');
+                  // Refresh the chat to update task status
+                  window.location.reload();
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : 'Failed to submit.');
+                } finally {
+                  setLifecycleLoading(false);
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-body text-xs font-semibold transition-all active:scale-95"
+              style={{
+                background: 'rgba(22,163,74,0.12)',
+                border: '1px solid rgba(22,163,74,0.3)',
+                color: 'var(--success, #16A34A)',
+              }}
+            >
+              {lifecycleLoading
+                ? <span className="w-3.5 h-3.5 border-2 border-green-300/30 border-t-green-400 rounded-full animate-spin" />
+                : <><CheckCircle2 size={13} /> Mark Done</>
+              }
+            </button>
+          )}
+
+          {/* Poster: Approve & Pay */}
+          {amIPoster && chat.task.status === 'submitted' && (
+            <button
+              disabled={lifecycleLoading}
+              onClick={async () => {
+                if (chat.agreedPrice) {
+                  setShowPayment(true);
+                } else {
+                  setLifecycleLoading(true);
+                  try {
+                    await apiCompleteTask(chat.task._id, {});
+                    toast.success(`🎉 Task approved!`);
+                    window.location.reload();
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : 'Failed to complete.');
+                  } finally {
+                    setLifecycleLoading(false);
+                  }
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-body text-xs font-semibold transition-all active:scale-95"
+              style={{
+                background: 'rgba(22,163,74,0.12)',
+                border: '1px solid rgba(22,163,74,0.3)',
+                color: 'var(--success, #16A34A)',
+              }}
+            >
+              {lifecycleLoading
+                ? <span className="w-3.5 h-3.5 border-2 border-green-300/30 border-t-green-400 rounded-full animate-spin" />
+                : <><Check size={13} /> {chat.agreedPrice ? 'Approve and Pay' : 'Approve Task'}</>
+              }
+            </button>
+          )}
+
+          {/* Doer sees "Submitted, awaiting poster" */}
+          {!amIPoster && chat.task.status === 'submitted' && (
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-body text-xs font-medium"
+                  style={{ background: 'rgba(124,58,237,0.08)', color: 'var(--primary-lt)' }}>
+              ⏳ Awaiting poster approval
+            </span>
+          )}
+
+          {/* Completed badge */}
+          {chat.task.status === 'completed' && (
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-body text-xs font-semibold"
+                  style={{ background: 'rgba(22,163,74,0.12)', color: 'var(--success, #16A34A)' }}>
+              <CheckCircle2 size={13} /> Task Completed ✓
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Messages */}

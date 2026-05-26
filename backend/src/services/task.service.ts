@@ -1,5 +1,6 @@
 import mongoose, { Types } from 'mongoose';
 import Task, { ITask, TaskDocument } from '../models/Task';
+import Chat from '../models/Chat';
 import {
   CreateTaskInput,
   UpdateTaskInput,
@@ -37,8 +38,9 @@ const ensureTaskExists = async (taskId: string): Promise<TaskDocument> => {
 
 export const listTasks = async (
   query: TaskQueryInput,
-  university: string
-): Promise<PaginatedResult<ITask>> => {
+  university: string,
+  userId?: string
+): Promise<PaginatedResult<ITask & { hasChat?: boolean }>> => {
   const { page, limit, status, category, urgency, minReward, maxReward, search, sortBy } = query;
 
   const filter: Record<string, unknown> = { university };
@@ -85,8 +87,23 @@ export const listTasks = async (
     Task.countDocuments(filter),
   ]);
 
+  // Attach hasChat flag for the requesting user
+  let enrichedTasks = tasks as unknown as (ITask & { hasChat?: boolean })[];
+  if (userId) {
+    const taskIds = tasks.map((t: any) => t._id);
+    const existingChats = await Chat.find(
+      { task: { $in: taskIds }, doer: userId },
+      { task: 1 }
+    ).lean();
+    const chatTaskIds = new Set(existingChats.map((c: any) => c.task.toString()));
+    enrichedTasks = enrichedTasks.map((t: any) => ({
+      ...t,
+      hasChat: chatTaskIds.has(t._id.toString()),
+    }));
+  }
+
   return {
-    data: tasks as unknown as ITask[],
+    data: enrichedTasks,
     pagination: {
       total,
       page,
@@ -215,19 +232,27 @@ export const applyToTask = async (
   );
   if (alreadyApplied) throw makeAppError('You have already applied to this task.', 409);
 
-  // Deduct 2-coin application fee (anti-spam measure)
-  await lockCoinsForTask(applicantId, 2);
+  // Wrap coin deduction + application push in a transaction for atomicity
+  const session = await mongoose.startSession();
+  try {
+    await session.withTransaction(async () => {
+      // Deduct 2-coin application fee (anti-spam measure)
+      await lockCoinsForTask(applicantId, 2, session);
 
-  task.applications.push({
-    _id: new Types.ObjectId(),
-    applicant: new Types.ObjectId(applicantId),
-    message: input.message,
-    appliedAt: new Date(),
-    isWithdrawn: false,
-  });
+      task.applications.push({
+        _id: new Types.ObjectId(),
+        applicant: new Types.ObjectId(applicantId),
+        message: input.message,
+        appliedAt: new Date(),
+        isWithdrawn: false,
+      });
 
-  await task.save();
-  return task;
+      await task.save({ session });
+    });
+    return task;
+  } finally {
+    await session.endSession();
+  }
 };
 
 // ─── Service: Withdraw Application ───────────────────────────────────────────
@@ -266,11 +291,9 @@ export const assignDoer = async (
   if (task.poster.toString() !== posterId) throw forbidden();
   if (task.status !== 'open') throw makeAppError('You can only assign a doer to an open task.', 400);
 
-  const validApplicant = task.applications.find(
-    (a) => a.applicant.toString() === input.applicantId && !a.isWithdrawn
-  );
-
-  if (!validApplicant) throw makeAppError('The selected user has not applied to this task.', 400);
+  // The poster can assign anyone they are chatting with.
+  // We no longer require a formal application document since we use chat-based interest.
+  // if (!validApplicant) throw makeAppError('The selected user has not applied to this task.', 400);
 
   task.doer = new Types.ObjectId(input.applicantId);
   task.status = 'in_progress';
@@ -288,7 +311,9 @@ export const submitTask = async (
   const task = await ensureTaskExists(taskId);
 
   if (!task.doer || task.doer.toString() !== doerId) throw forbidden('Only the assigned doer can submit this task.');
-  if (task.status !== 'in_progress') throw makeAppError('Task is not currently in progress.', 400);
+  if (!['in_progress', 'submitted'].includes(task.status)) {
+    throw makeAppError('Task is not currently in progress.', 400);
+  }
 
   task.status = 'submitted';
   task.submissionNote = input.submissionNote;
@@ -331,7 +356,9 @@ export const getMyTasks = async (
   page: number,
   limit: number
 ): Promise<PaginatedResult<ITask>> => {
-  const filter = role === 'poster' ? { poster: userId } : { doer: userId };
+  const filter: Record<string, unknown> = role === 'poster'
+    ? { poster: userId }
+    : { doer: userId, status: { $in: ['in_progress', 'submitted', 'completed'] } };
   const skip = (page - 1) * limit;
 
   const [tasks, total] = await Promise.all([

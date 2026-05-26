@@ -53,6 +53,7 @@ export const listMyChats = async (userId: string): Promise<IChat[]> => {
     .populate('task',   'title coinReward category status')
     .populate('poster', 'name avatarUrl')
     .populate('doer',   'name avatarUrl')
+    .populate('messages.sender', 'name avatarUrl')
     .sort({ updatedAt: -1 })
     .lean();
 
@@ -127,6 +128,11 @@ export const setAgreedPrice = async (
 
   const isMember = chat.poster.toString() === userId || chat.doer.toString() === userId;
   if (!isMember) throw makeAppError('Access denied.', 403);
+
+  // Only the task poster can set the agreed price
+  if (chat.poster.toString() !== userId) {
+    throw makeAppError('Only the task poster can set the price.', 403);
+  }
 
   chat.agreedPrice = price;
 
