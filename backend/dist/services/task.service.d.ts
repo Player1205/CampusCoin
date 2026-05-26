@@ -1,7 +1,9 @@
 import { ITask, TaskDocument } from '../models/Task';
 import { CreateTaskInput, UpdateTaskInput, ApplyToTaskInput, AssignDoerInput, SubmitTaskInput, CompleteTaskInput, TaskQueryInput } from '../validations/swap.schema';
 import { PaginatedResult } from '../utils/service.helpers';
-export declare const listTasks: (query: TaskQueryInput, university: string) => Promise<PaginatedResult<ITask>>;
+export declare const listTasks: (query: TaskQueryInput, university: string, userId?: string) => Promise<PaginatedResult<ITask & {
+    hasChat?: boolean;
+}>>;
 export declare const getTaskById: (taskId: string) => Promise<TaskDocument>;
 export declare const createTask: (input: CreateTaskInput, posterId: string, university: string) => Promise<TaskDocument>;
 export declare const updateTask: (taskId: string, input: UpdateTaskInput, requesterId: string) => Promise<TaskDocument>;

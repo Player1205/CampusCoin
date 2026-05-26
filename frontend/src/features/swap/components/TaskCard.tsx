@@ -55,7 +55,7 @@ export default function TaskCard({ task, compact = false, onInterested }: TaskCa
   const navigate    = useNavigate();
   const currentUser = useAuthStore((s) => s.user);
   const [loading,   setLoading]   = useState(false);
-  const [chatted,   setChatted]   = useState(false);
+  const [chatted,   setChatted]   = useState(task.hasChat ?? false);
 
   const urgency   = URGENCY_CONFIG[task.urgency];
   const isOwnTask = currentUser?._id === task.poster._id;

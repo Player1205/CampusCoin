@@ -39,6 +39,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getMyTasks = exports.completeTask = exports.submitTask = exports.assignDoer = exports.withdrawApplication = exports.applyToTask = exports.cancelTask = exports.updateTask = exports.createTask = exports.getTaskById = exports.listTasks = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
 const Task_1 = __importDefault(require("../models/Task"));
+const Chat_1 = __importDefault(require("../models/Chat"));
 const coin_service_1 = require("./coin.service");
 const service_helpers_1 = require("../utils/service.helpers");
 const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -52,7 +53,7 @@ const ensureTaskExists = async (taskId) => {
         throw taskNotFound();
     return task;
 };
-const listTasks = async (query, university) => {
+const listTasks = async (query, university, userId) => {
     const { page, limit, status, category, urgency, minReward, maxReward, search, sortBy } = query;
     const filter = { university };
     if (status)
@@ -94,8 +95,18 @@ const listTasks = async (query, university) => {
             .lean(),
         Task_1.default.countDocuments(filter),
     ]);
+    let enrichedTasks = tasks;
+    if (userId) {
+        const taskIds = tasks.map((t) => t._id);
+        const existingChats = await Chat_1.default.find({ task: { $in: taskIds }, doer: userId }, { task: 1 }).lean();
+        const chatTaskIds = new Set(existingChats.map((c) => c.task.toString()));
+        enrichedTasks = enrichedTasks.map((t) => ({
+            ...t,
+            hasChat: chatTaskIds.has(t._id.toString()),
+        }));
+    }
     return {
-        data: tasks,
+        data: enrichedTasks,
         pagination: {
             total,
             page,
@@ -185,16 +196,24 @@ const applyToTask = async (taskId, input, applicantId) => {
     const alreadyApplied = task.applications.some((a) => a.applicant.toString() === applicantId && !a.isWithdrawn);
     if (alreadyApplied)
         throw (0, service_helpers_1.makeAppError)('You have already applied to this task.', 409);
-    await (0, coin_service_1.lockCoinsForTask)(applicantId, 2);
-    task.applications.push({
-        _id: new mongoose_1.Types.ObjectId(),
-        applicant: new mongoose_1.Types.ObjectId(applicantId),
-        message: input.message,
-        appliedAt: new Date(),
-        isWithdrawn: false,
-    });
-    await task.save();
-    return task;
+    const session = await mongoose_1.default.startSession();
+    try {
+        await session.withTransaction(async () => {
+            await (0, coin_service_1.lockCoinsForTask)(applicantId, 2, session);
+            task.applications.push({
+                _id: new mongoose_1.Types.ObjectId(),
+                applicant: new mongoose_1.Types.ObjectId(applicantId),
+                message: input.message,
+                appliedAt: new Date(),
+                isWithdrawn: false,
+            });
+            await task.save({ session });
+        });
+        return task;
+    }
+    finally {
+        await session.endSession();
+    }
 };
 exports.applyToTask = applyToTask;
 const withdrawApplication = async (taskId, applicantId) => {
@@ -216,9 +235,6 @@ const assignDoer = async (taskId, input, posterId) => {
         throw forbidden();
     if (task.status !== 'open')
         throw (0, service_helpers_1.makeAppError)('You can only assign a doer to an open task.', 400);
-    const validApplicant = task.applications.find((a) => a.applicant.toString() === input.applicantId && !a.isWithdrawn);
-    if (!validApplicant)
-        throw (0, service_helpers_1.makeAppError)('The selected user has not applied to this task.', 400);
     task.doer = new mongoose_1.Types.ObjectId(input.applicantId);
     task.status = 'in_progress';
     await task.save();
@@ -229,8 +245,9 @@ const submitTask = async (taskId, input, doerId) => {
     const task = await ensureTaskExists(taskId);
     if (!task.doer || task.doer.toString() !== doerId)
         throw forbidden('Only the assigned doer can submit this task.');
-    if (task.status !== 'in_progress')
+    if (!['in_progress', 'submitted'].includes(task.status)) {
         throw (0, service_helpers_1.makeAppError)('Task is not currently in progress.', 400);
+    }
     task.status = 'submitted';
     task.submissionNote = input.submissionNote;
     await task.save();
@@ -256,7 +273,9 @@ const completeTask = async (taskId, input, posterId) => {
 };
 exports.completeTask = completeTask;
 const getMyTasks = async (userId, role, page, limit) => {
-    const filter = role === 'poster' ? { poster: userId } : { doer: userId };
+    const filter = role === 'poster'
+        ? { poster: userId }
+        : { doer: userId, status: { $in: ['in_progress', 'submitted', 'completed'] } };
     const skip = (page - 1) * limit;
     const [tasks, total] = await Promise.all([
         Task_1.default.find(filter)

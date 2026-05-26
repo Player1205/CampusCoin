@@ -50,6 +50,7 @@ const listMyChats = async (userId) => {
         .populate('task', 'title coinReward category status')
         .populate('poster', 'name avatarUrl')
         .populate('doer', 'name avatarUrl')
+        .populate('messages.sender', 'name avatarUrl')
         .sort({ updatedAt: -1 })
         .lean();
     return chats;
@@ -105,6 +106,9 @@ const setAgreedPrice = async (chatId, userId, price) => {
     const isMember = chat.poster.toString() === userId || chat.doer.toString() === userId;
     if (!isMember)
         throw (0, service_helpers_1.makeAppError)('Access denied.', 403);
+    if (chat.poster.toString() !== userId) {
+        throw (0, service_helpers_1.makeAppError)('Only the task poster can set the price.', 403);
+    }
     chat.agreedPrice = price;
     chat.messages.push({
         _id: new mongoose_1.Types.ObjectId(),

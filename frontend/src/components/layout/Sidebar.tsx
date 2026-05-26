@@ -2,7 +2,6 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { Home, ListTodo, Sparkles, User, Zap, LogOut, Settings, MessageCircle } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useCoinStore, selectBalance } from '@/store/useCoinStore';
-import { useChatList } from '@/features/chat/hooks/useChat';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import toast from 'react-hot-toast';
 
@@ -18,7 +17,6 @@ export default function Sidebar() {
   const user      = useAuthStore((s) => s.user);
   const logout    = useAuthStore((s) => s.logout);
   const balance   = useCoinStore(selectBalance);
-  const { chats } = useChatList();
   const navigate  = useNavigate();
 
   const handleLogout = async () => {
@@ -75,7 +73,6 @@ export default function Sidebar() {
           Menu
         </p>
         {NAV.map(({ path, label, icon: Icon, accent }) => {
-          const chatBadge = path === '/chats' && chats.length > 0;
           return (
             <NavLink
               key={path}
@@ -104,13 +101,7 @@ export default function Sidebar() {
                         filter: isActive ? `drop-shadow(0 0 4px ${accent}70)` : 'none',
                       }}
                     />
-                    {chatBadge && !isActive && (
-                      <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[9px]
-                                       font-bold text-white flex items-center justify-center"
-                            style={{ background: '#F97316' }}>
-                        {chats.length}
-                      </span>
-                    )}
+
                   </div>
                   <span>{label}</span>
                   {isActive && (

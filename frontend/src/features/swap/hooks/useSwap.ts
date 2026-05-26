@@ -157,3 +157,41 @@ export function useTaskActions(onSuccess?: (task: Task) => void) {
 
   return { pending, apply, withdraw, cancel, assign, submit, complete, postTask };
 }
+
+// ─── useMyTasks ───────────────────────────────────────────────────────────────
+
+export function useMyTasks(role: 'poster' | 'doer', limit = 10) {
+  const [tasks, setTasks]           = useState<Task[]>([]);
+  const [pagination, setPagination] = useState<{ total: number; page: number; hasNextPage: boolean } | null>(null);
+  const [isLoading, setIsLoading]   = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [page, setPage]             = useState(1);
+
+  const load = useCallback(async (p: number, append = false) => {
+    append ? setIsLoadingMore(true) : setIsLoading(true);
+    try {
+      const result = await swapApi.fetchMyTasks(role, p, limit);
+      setTasks((prev) => append ? [...prev, ...result.data] : result.data);
+      setPagination(result.pagination);
+    } catch {
+      // silent
+    } finally {
+      setIsLoading(false);
+      setIsLoadingMore(false);
+    }
+  }, [role, limit]);
+
+  useEffect(() => {
+    setPage(1);
+    void load(1);
+  }, [load]);
+
+  const loadNextPage = useCallback(() => {
+    if (!pagination?.hasNextPage || isLoadingMore) return;
+    const next = page + 1;
+    setPage(next);
+    void load(next, true);
+  }, [page, pagination, isLoadingMore, load]);
+
+  return { tasks, pagination, isLoading, isLoadingMore, loadNextPage };
+}

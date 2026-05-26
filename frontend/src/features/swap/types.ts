@@ -61,6 +61,7 @@ export interface Task {
   completionNote?: string;
   university: string;
   viewCount: number;
+  hasChat?: boolean;
   createdAt: string;
   updatedAt: string;
 }

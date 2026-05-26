@@ -37,7 +37,7 @@ exports.getMyTasks = exports.completeTask = exports.submitTask = exports.assignD
 const taskService = __importStar(require("../services/task.service"));
 const listTasks = async (req, res, next) => {
     try {
-        const result = await taskService.listTasks(req.query, req.user.university);
+        const result = await taskService.listTasks(req.query, req.user.university, req.user._id.toString());
         res.status(200).json({
             status: 'success',
             data: result,
