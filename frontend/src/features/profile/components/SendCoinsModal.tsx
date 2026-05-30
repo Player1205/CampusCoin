@@ -1,4 +1,5 @@
-import { useState, FormEvent } from 'react';
+import type { FormEvent } from 'react';
+import { useState } from 'react';
 import { Zap, X, AlertCircle } from 'lucide-react';
 import { useCoinStore, selectBalance } from '@/store/useCoinStore';
 import toast from 'react-hot-toast';

@@ -206,7 +206,11 @@ export default function Home() {
       setPostPage((p) => p + 1);
       setLocalPosts((prev) => [...prev, ...r.data]);
       setHasMore(r.pagination.hasNextPage);
-    } catch { } finally { setLoadingMore(false); }
+    } catch (error) { 
+      console.error('Failed to load more posts', error); 
+    } finally { 
+      setLoadingMore(false); 
+    }
   };
 
   return (

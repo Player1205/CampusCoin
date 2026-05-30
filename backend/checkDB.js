@@ -1,6 +1,7 @@
 const { MongoClient } = require('mongodb');
 require('dotenv').config();
 
+//connection-mongodb
 async function run() {
   const uri = process.env.MONGO_URI;
   if (!uri) throw new Error("No MONGO_URI in .env");

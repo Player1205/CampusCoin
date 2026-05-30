@@ -1,4 +1,5 @@
-import axios, { AxiosError, type InternalAxiosRequestConfig, type AxiosResponse } from 'axios';
+import type { AxiosError} from 'axios';
+import axios, { type InternalAxiosRequestConfig, type AxiosResponse } from 'axios';
 
 // ─── Instance ─────────────────────────────────────────────────────────────────
 
