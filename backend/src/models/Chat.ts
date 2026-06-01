@@ -52,6 +52,8 @@ const chatSchema = new Schema<IChat>(
 chatSchema.index({ poster: 1, doer: 1, task: 1 }, { unique: true });
 chatSchema.index({ poster: 1 });
 chatSchema.index({ doer: 1 });
+chatSchema.index({ updatedAt: -1 });
+chatSchema.index({ isActive: 1, updatedAt: -1 });
 
 const Chat = mongoose.model<IChat, Model<IChat>>('Chat', chatSchema);
 export default Chat;

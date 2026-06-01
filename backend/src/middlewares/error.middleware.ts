@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import chalk from 'chalk';
 import { Error as MongooseError } from 'mongoose';
+import logger from '../utils/logger';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -45,11 +45,12 @@ export const errorHandler = (
   res: Response,
   _next: NextFunction
 ): void => {
-  // ── Console Logging ────────────────────────────────────────────────────────
-  console.error(chalk.red('✖  Error:'), chalk.yellow(err.message));
-  if (process.env.NODE_ENV === 'development') {
-    console.error(chalk.gray(err.stack ?? ''));
-  }
+  // ── Structured Logging ─────────────────────────────────────────────────────
+  logger.error('Request error', {
+    message: err.message,
+    statusCode: err.statusCode ?? 500,
+    stack: err.stack,
+  });
 
   // ── Defaults ───────────────────────────────────────────────────────────────
   let statusCode = err.statusCode ?? 500;

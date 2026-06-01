@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import chalk from 'chalk';
+import logger from '../utils/logger';
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 3000;
@@ -11,7 +11,7 @@ export const connectDB = async (): Promise<void> => {
   const uri = process.env.MONGO_URI;
 
   if (!uri) {
-    console.error(chalk.red('✖  MONGO_URI is not defined in environment variables.'));
+    logger.error('MONGO_URI is not defined in environment variables.');
     process.exit(1);
   }
 
@@ -24,23 +24,22 @@ export const connectDB = async (): Promise<void> => {
         socketTimeoutMS: 45000,
       });
 
-      console.log(
-        chalk.green(`✔  MongoDB connected: ${chalk.bold(conn.connection.host)} `) +
-          chalk.gray(`[attempt ${attempt}/${MAX_RETRIES}]`)
-      );
+      logger.info('MongoDB connected', {
+        host: conn.connection.host,
+        attempt: `${attempt}/${MAX_RETRIES}`,
+      });
       return;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error(
-        chalk.red(`✖  MongoDB connection failed (attempt ${attempt}/${MAX_RETRIES}): `) +
-          chalk.yellow(message)
-      );
+      logger.error(`MongoDB connection failed (attempt ${attempt}/${MAX_RETRIES})`, {
+        error: message,
+      });
 
       if (attempt < MAX_RETRIES) {
-        console.log(chalk.yellow(`   Retrying in ${RETRY_DELAY_MS / 1000}s…`));
+        logger.warn(`Retrying in ${RETRY_DELAY_MS / 1000}s…`);
         await sleep(RETRY_DELAY_MS);
       } else {
-        console.error(chalk.red.bold('   Max retries reached. Exiting.'));
+        logger.error('Max retries reached. Exiting.');
         process.exit(1);
       }
     }
@@ -50,5 +49,5 @@ export const connectDB = async (): Promise<void> => {
 // Graceful shutdown helper — call from server.ts on SIGTERM / SIGINT
 export const disconnectDB = async (): Promise<void> => {
   await mongoose.connection.close();
-  console.log(chalk.yellow('⚠  MongoDB connection closed.'));
+  logger.warn('MongoDB connection closed.');
 };

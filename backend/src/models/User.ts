@@ -94,5 +94,9 @@ userSchema.methods.toSafeObject = function () {
   return safe;
 };
 
+// ─── Indexes ──────────────────────────────────────────────────────────────────
+userSchema.index({ university: 1, isActive: 1 });
+userSchema.index({ isVerified: 1 });
+
 const User = mongoose.model<IUser, UserModel>('User', userSchema);
 export default User;
