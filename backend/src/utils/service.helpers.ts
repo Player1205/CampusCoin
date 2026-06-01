@@ -14,6 +14,15 @@ export interface PaginatedResult<T> {
   pagination: PaginationMeta;
 }
 
+export interface CursorPaginationMeta extends PaginationMeta {
+  nextCursor: string | null;
+}
+
+export interface CursorPaginatedResult<T> {
+  data: T[];
+  pagination: CursorPaginationMeta;
+}
+
 // ─── Error Factory ────────────────────────────────────────────────────────────
 
 /**

@@ -45,6 +45,7 @@ export interface PostFilters {
   type?: PostType;
   authorId?: string;
   sortBy?: 'newest' | 'oldest' | 'most_liked';
+  cursor?: string;
 }
 
 export interface PaginatedPosts {
@@ -56,6 +57,7 @@ export interface PaginatedPosts {
     totalPages: number;
     hasNextPage: boolean;
     hasPrevPage: boolean;
+    nextCursor?: string | null;
   };
 }
 

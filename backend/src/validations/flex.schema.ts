@@ -91,6 +91,11 @@ export const postQuerySchema = z.object({
     .optional(),
 
   sortBy: z.enum(['newest', 'oldest', 'most_liked']).default('newest'),
+
+  cursor: z
+    .string()
+    .datetime({ message: 'Cursor must be a valid ISO date string' })
+    .optional(),
 });
 
 // ─── Inferred Types ───────────────────────────────────────────────────────────

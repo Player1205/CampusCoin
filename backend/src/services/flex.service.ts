@@ -6,7 +6,7 @@ import {
   CreateCommentInput,
   PostQueryInput,
 } from '../validations/flex.schema';
-import { PaginatedResult, makeAppError } from '../utils/service.helpers';
+import { CursorPaginatedResult, makeAppError } from '../utils/service.helpers';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -27,21 +27,27 @@ const ensurePostExists = async (postId: string): Promise<PostDocument> => {
 export const listPosts = async (
   query: PostQueryInput,
   university: string
-): Promise<PaginatedResult<IPost>> => {
-  const { page, limit, type, authorId, sortBy } = query;
+): Promise<CursorPaginatedResult<IPost>> => {
+  const { page, limit, type, authorId, sortBy, cursor } = query;
 
   const filter: Record<string, unknown> = { university, isVisible: true };
 
   if (type) filter.type = type;
   if (authorId) filter.author = authorId;
 
+  // Cursor-based pagination: use createdAt instead of skip/offset
+  const useCursor = !!cursor;
+  if (useCursor) {
+    filter.createdAt = { $lt: new Date(cursor) };
+  }
+
+  const skip = useCursor ? 0 : (page - 1) * limit;
+
   const sortMap: Record<string, Record<string, 1 | -1>> = {
     newest: { isPinned: -1, createdAt: -1 },
     oldest: { createdAt: 1 },
     most_liked: { isPinned: -1 }, // will use $size of likes — handled via aggregation
   };
-
-  const skip = (page - 1) * limit;
 
   // For most_liked, use aggregation pipeline for accurate sorting by array size
   if (sortBy === 'most_liked') {
@@ -67,6 +73,11 @@ export const listPosts = async (
 
     const total = await Post.countDocuments(filter);
 
+    // Calculate nextCursor from the last result's createdAt
+    const nextCursor = results.length === limit && results.length > 0
+      ? new Date(results[results.length - 1].createdAt).toISOString()
+      : null;
+
     return {
       data: results as unknown as IPost[],
       pagination: {
@@ -74,8 +85,9 @@ export const listPosts = async (
         page,
         limit,
         totalPages: Math.ceil(total / limit),
-        hasNextPage: page * limit < total,
+        hasNextPage: useCursor ? nextCursor !== null : page * limit < total,
         hasPrevPage: page > 1,
+        nextCursor,
       },
     };
   }
@@ -94,6 +106,11 @@ export const listPosts = async (
     Post.countDocuments(filter),
   ]);
 
+  // Calculate nextCursor from the last post's createdAt
+  const nextCursor = posts.length === limit && posts.length > 0
+    ? new Date(posts[posts.length - 1].createdAt).toISOString()
+    : null;
+
   return {
     data: posts as unknown as IPost[],
     pagination: {
@@ -101,8 +118,9 @@ export const listPosts = async (
       page,
       limit,
       totalPages: Math.ceil(total / limit),
-      hasNextPage: page * limit < total,
+      hasNextPage: useCursor ? nextCursor !== null : page * limit < total,
       hasPrevPage: page > 1,
+      nextCursor,
     },
   };
 };

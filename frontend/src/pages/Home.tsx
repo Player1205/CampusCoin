@@ -157,6 +157,7 @@ export default function Home() {
   const [localPosts,   setLocalPosts]   = useState<Post[]>([]);
   const [postPage,     setPostPage]     = useState(1);
   const [hasMore,      setHasMore]      = useState(false);
+  const [nextCursor,   setNextCursor]   = useState<string | null>(null);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [postsLoading, setPostsLoading] = useState(true);
   const [loadingMore,  setLoadingMore]  = useState(false);
@@ -192,7 +193,7 @@ export default function Home() {
   useEffect(() => {
     setPostsLoading(true);
     fetchPosts({ page: 1, limit: 6, sortBy: 'newest' })
-      .then((r) => { setPosts(r.data); setLocalPosts(r.data); setHasMore(r.pagination.hasNextPage); })
+      .then((r) => { setPosts(r.data); setLocalPosts(r.data); setHasMore(r.pagination.hasNextPage); setNextCursor(r.pagination.nextCursor ?? null); })
       .catch(() => {})
       .finally(() => setPostsLoading(false));
   }, []);
@@ -202,10 +203,14 @@ export default function Home() {
   const loadMorePosts = async () => {
     setLoadingMore(true);
     try {
-      const r = await fetchPosts({ page: postPage + 1, limit: 6, sortBy: 'newest' });
+      const params = nextCursor
+        ? { cursor: nextCursor, limit: 6, sortBy: 'newest' as const }
+        : { page: postPage + 1, limit: 6, sortBy: 'newest' as const };
+      const r = await fetchPosts(params);
       setPostPage((p) => p + 1);
       setLocalPosts((prev) => [...prev, ...r.data]);
       setHasMore(r.pagination.hasNextPage);
+      setNextCursor(r.pagination.nextCursor ?? null);
     } catch (error) { 
       console.error('Failed to load more posts', error); 
     } finally { 

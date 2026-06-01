@@ -14,6 +14,7 @@ export function usePostFeed(initialFilters: PostFilters = {}) {
   const [isLoading, setIsLoading]   = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError]           = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const abortRef                    = useRef<AbortController | null>(null);
 
   const load = useCallback(async (f: PostFilters, append = false) => {
@@ -25,6 +26,7 @@ export function usePostFeed(initialFilters: PostFilters = {}) {
       const result = await flexApi.fetchPosts(f);
       setPosts((prev) => append ? [...prev, ...result.data] : result.data);
       setPagination(result.pagination);
+      setNextCursor(result.pagination.nextCursor ?? null);
     } catch (err) {
       if (err instanceof Error && err.name !== 'AbortError') setError(err.message);
     } finally {
@@ -44,10 +46,18 @@ export function usePostFeed(initialFilters: PostFilters = {}) {
 
   const loadNextPage = useCallback(() => {
     if (!pagination?.hasNextPage || isLoadingMore) return;
-    const next = { ...filters, page: (filters.page ?? 1) + 1 };
-    setFilters(next);
-    void load(next, true);
-  }, [filters, pagination, isLoadingMore, load]);
+    if (nextCursor) {
+      // Cursor-based: use nextCursor instead of page increment
+      const next = { ...filters, cursor: nextCursor, page: (filters.page ?? 1) + 1 };
+      setFilters(next);
+      void load(next, true);
+    } else {
+      // Fallback: page-based pagination
+      const next = { ...filters, page: (filters.page ?? 1) + 1 };
+      setFilters(next);
+      void load(next, true);
+    }
+  }, [filters, pagination, isLoadingMore, nextCursor, load]);
 
   /** Optimistically prepend a new post to the feed */
   const prependPost = useCallback((post: Post) => {
@@ -65,7 +75,7 @@ export function usePostFeed(initialFilters: PostFilters = {}) {
   }, []);
 
   return {
-    posts, pagination, filters,
+    posts, pagination, filters, nextCursor,
     isLoading, isLoadingMore, error,
     applyFilters, loadNextPage, prependPost, updatePost, removePost,
   };
