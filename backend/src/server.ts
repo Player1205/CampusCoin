@@ -1,48 +1,115 @@
 import 'dotenv/config';
-import chalk from 'chalk';
+import http from 'http';
+import { Server as SocketServer } from 'socket.io';
+import jwt from 'jsonwebtoken';
 import app from './app';
 import { connectDB, disconnectDB } from './config/db';
+import logger from './utils/logger';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const PORT = parseInt(process.env.PORT ?? '5000', 10);
 const ENV = process.env.NODE_ENV ?? 'development';
+const allowedOrigins = (process.env.CLIENT_ORIGIN ?? 'http://localhost:5173').split(',');
+
+// ─── HTTP + Socket.io ─────────────────────────────────────────────────────────
+
+const httpServer = http.createServer(app);
+
+export const io = new SocketServer(httpServer, {
+  cors: {
+    origin: allowedOrigins,
+    credentials: true,
+  },
+  pingTimeout: 60000,
+  pingInterval: 25000,
+});
+
+// ─── Socket.io Auth Middleware ────────────────────────────────────────────────
+
+io.use((socket, next) => {
+  try {
+    const token =
+      socket.handshake.auth?.token ??
+      socket.handshake.headers?.cookie
+        ?.split('; ')
+        .find((c: string) => c.startsWith('token='))
+        ?.split('=')[1];
+
+    if (!token) return next(new Error('Authentication required'));
+
+    const secret = process.env.JWT_SECRET;
+    if (!secret) return next(new Error('Server misconfigured'));
+
+    const decoded = jwt.verify(token, secret) as { userId: string };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (socket as any).userId = decoded.userId;
+    next();
+  } catch {
+    next(new Error('Invalid token'));
+  }
+});
+
+// ─── Socket.io Connection Handler ─────────────────────────────────────────────
+
+io.on('connection', (socket) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const userId = (socket as any).userId as string;
+  logger.info('Socket connected', { userId, socketId: socket.id });
+
+  // Join personal room for user-targeted events
+  socket.join(`user:${userId}`);
+
+  // Join a chat room
+  socket.on('join_chat', (chatId: string) => {
+    socket.join(`chat:${chatId}`);
+    logger.debug('User joined chat room', { userId, chatId });
+  });
+
+  // Leave a chat room
+  socket.on('leave_chat', (chatId: string) => {
+    socket.leave(`chat:${chatId}`);
+  });
+
+  socket.on('disconnect', (reason) => {
+    logger.info('Socket disconnected', { userId, socketId: socket.id, reason });
+  });
+});
 
 // ─── Boot Sequence ────────────────────────────────────────────────────────────
 
 const boot = async (): Promise<void> => {
-  console.log(chalk.cyan.bold('\n╔══════════════════════════════════════╗'));
-  console.log(chalk.cyan.bold('║        CampusCoin API Server         ║'));
-  console.log(chalk.cyan.bold('╚══════════════════════════════════════╝\n'));
+  logger.info('═══════════════════════════════════════');
+  logger.info('       CampusCoin API Server');
+  logger.info('═══════════════════════════════════════');
 
   // 1. Connect to MongoDB
   await connectDB();
 
-  // 2. Start HTTP listener
-  const server = app.listen(PORT, () => {
-    console.log(
-      chalk.green(`✔  Server running on port `) +
-        chalk.green.bold(`${PORT}`) +
-        chalk.gray(` [${ENV.toUpperCase()}]`)
-    );
-    console.log(chalk.gray(`   → http://localhost:${PORT}/health\n`));
+  // 2. Start HTTP + WebSocket listener
+  httpServer.listen(PORT, () => {
+    logger.info(`Server running on port ${PORT}`, { env: ENV.toUpperCase() });
+    logger.info(`Health check: http://localhost:${PORT}/health`);
   });
 
   // ─── Graceful Shutdown ─────────────────────────────────────────────────────
 
   const shutdown = async (signal: string): Promise<void> => {
-    console.log(chalk.yellow(`\n⚠  Received ${signal}. Shutting down gracefully…`));
+    logger.warn(`Received ${signal}. Shutting down gracefully…`);
 
-    server.close(async () => {
-      console.log(chalk.yellow('   HTTP server closed.'));
+    // Close Socket.io connections
+    io.close();
+
+    httpServer.close(async () => {
+      logger.warn('HTTP server closed.');
       await disconnectDB();
-      console.log(chalk.yellow('   Process terminated.\n'));
+      logger.warn('Process terminated.');
       process.exit(0);
     });
 
     // Force exit if graceful shutdown takes too long
     setTimeout(() => {
-      console.error(chalk.red('   Forced shutdown after timeout.'));
+      logger.error('Forced shutdown after timeout.');
       process.exit(1);
     }, 10_000);
   };
@@ -53,17 +120,17 @@ const boot = async (): Promise<void> => {
   // ─── Unhandled Rejections ──────────────────────────────────────────────────
 
   process.on('unhandledRejection', (reason: unknown) => {
-    console.error(chalk.red('✖  Unhandled Promise Rejection:'), reason);
-    server.close(() => process.exit(1));
+    logger.error('Unhandled Promise Rejection', { reason });
+    httpServer.close(() => process.exit(1));
   });
 
   process.on('uncaughtException', (err: Error) => {
-    console.error(chalk.red('✖  Uncaught Exception:'), err.message);
+    logger.error('Uncaught Exception', { message: err.message, stack: err.stack });
     process.exit(1);
   });
 };
 
 boot().catch((err: unknown) => {
-  console.error(chalk.red('✖  Boot failed:'), err);
+  logger.error('Boot failed', { error: err });
   process.exit(1);
 });

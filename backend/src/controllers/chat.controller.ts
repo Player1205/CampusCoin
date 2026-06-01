@@ -27,15 +27,32 @@ export const getChatById = async (req: AuthenticatedRequest, res: Response, next
 export const sendMessage = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { content, type, paymentAmount, paymentMethod } = req.body as SendMessageInput;
-    const chat = await chatService.sendMessage(req.params.chatId, req.user!._id.toString(), content, type, paymentAmount, paymentMethod);
+    const chatId = req.params.chatId;
+    const chat = await chatService.sendMessage(chatId, req.user!._id.toString(), content, type, paymentAmount, paymentMethod);
     res.status(200).json({ status: 'success', data: { chat } });
+
+    // Emit to chat room for real-time delivery
+    const { io } = await import('../server');
+    const lastMsg = chat.messages[chat.messages.length - 1];
+    io.to(`chat:${chatId}`).emit('new_message', {
+      chatId,
+      message: lastMsg,
+    });
   } catch (err) { next(err); }
 };
 
 export const setAgreedPrice = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { price } = req.body as SetAgreedPriceInput;
-    const chat = await chatService.setAgreedPrice(req.params.chatId, req.user!._id.toString(), price);
+    const chatId = req.params.chatId;
+    const chat = await chatService.setAgreedPrice(chatId, req.user!._id.toString(), price);
     res.status(200).json({ status: 'success', data: { chat } });
+
+    // Emit to chat room for real-time price update
+    const { io } = await import('../server');
+    io.to(`chat:${chatId}`).emit('price_updated', {
+      chatId,
+      agreedPrice: price,
+    });
   } catch (err) { next(err); }
 };
