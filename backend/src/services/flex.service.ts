@@ -7,6 +7,7 @@ import {
   PostQueryInput,
 } from '../validations/flex.schema';
 import { CursorPaginatedResult, makeAppError } from '../utils/service.helpers';
+import { uploadImage } from '../utils/cloudinary';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -146,8 +147,15 @@ export const createPost = async (
   authorId: string,
   university: string
 ): Promise<PostDocument> => {
+  // Upload base64 image to Cloudinary (if configured)
+  let imageUrl = input.imageUrl;
+  if (imageUrl && imageUrl.startsWith('data:image/')) {
+    imageUrl = await uploadImage(imageUrl, 'campuscoin/posts');
+  }
+
   const post = await Post.create({
     ...input,
+    imageUrl,
     author: authorId,
     university,
     taggedUsers: input.taggedUsers.map((id) => new Types.ObjectId(id)),

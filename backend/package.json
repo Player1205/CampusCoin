@@ -10,8 +10,10 @@
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
+    "@socket.io/redis-adapter": "^8.3.0",
     "bcryptjs": "^2.4.3",
     "chalk": "^4.1.2",
+    "cloudinary": "^2.10.0",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -23,6 +25,7 @@
     "mongoose": "^8.4.1",
     "morgan": "^1.10.0",
     "nodemailer": "^8.0.7",
+    "redis": "^6.0.0",
     "socket.io": "^4.8.3",
     "winston": "^3.19.0",
     "zod": "^3.23.8"
