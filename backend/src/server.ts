@@ -86,7 +86,30 @@ const boot = async (): Promise<void> => {
   // 1. Connect to MongoDB
   await connectDB();
 
-  // 2. Start HTTP + WebSocket listener
+  // 2. Connect Redis adapter for multi-instance Socket.io (optional)
+  const redisUrl = process.env.REDIS_URL;
+  if (redisUrl) {
+    try {
+      const { createClient } = await import('redis');
+      const { createAdapter } = await import('@socket.io/redis-adapter');
+
+      const pubClient = createClient({ url: redisUrl });
+      const subClient = pubClient.duplicate();
+
+      await Promise.all([pubClient.connect(), subClient.connect()]);
+
+      io.adapter(createAdapter(pubClient, subClient));
+      logger.info('Redis adapter attached to Socket.io', { url: redisUrl.replace(/\/\/.*@/, '//***@') });
+    } catch (err) {
+      logger.warn('Redis connection failed — falling back to in-memory adapter', {
+        error: err instanceof Error ? err.message : err,
+      });
+    }
+  } else {
+    logger.info('REDIS_URL not set — using in-memory Socket.io adapter (single instance only)');
+  }
+
+  // 3. Start HTTP + WebSocket listener
   httpServer.listen(PORT, () => {
     logger.info(`Server running on port ${PORT}`, { env: ENV.toUpperCase() });
     logger.info(`Health check: http://localhost:${PORT}/health`);
