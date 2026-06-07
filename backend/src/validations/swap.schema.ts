@@ -62,7 +62,7 @@ export const createTaskSchema = z.object({
     .array(z.string().min(1).max(30).trim())
     .max(5, 'Maximum 5 tags allowed')
     .default([]),
-});
+}).strict();
 
 // ─── Update Task ──────────────────────────────────────────────────────────────
 
@@ -78,7 +78,7 @@ export const applyToTaskSchema = z.object({
     .min(10, 'Message must be at least 10 characters')
     .max(500, 'Message cannot exceed 500 characters')
     .trim(),
-});
+}).strict();
 
 // ─── Assign Doer ─────────────────────────────────────────────────────────────
 
@@ -86,7 +86,7 @@ export const assignDoerSchema = z.object({
   applicantId: z
     .string({ required_error: 'Applicant ID is required' })
     .regex(/^[a-f\d]{24}$/i, 'Invalid user ID format'),
-});
+}).strict();
 
 // ─── Submit Task ──────────────────────────────────────────────────────────────
 
@@ -96,7 +96,7 @@ export const submitTaskSchema = z.object({
     .min(10, 'Submission note must be at least 10 characters')
     .max(1000, 'Submission note cannot exceed 1000 characters')
     .trim(),
-});
+}).strict();
 
 // ─── Complete Task (poster approval) ─────────────────────────────────────────
 
@@ -106,7 +106,7 @@ export const completeTaskSchema = z.object({
     .max(500, 'Completion note cannot exceed 500 characters')
     .trim()
     .optional(),
-});
+}).strict();
 
 // ─── Query / Filter Tasks ─────────────────────────────────────────────────────
 

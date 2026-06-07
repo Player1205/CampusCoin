@@ -23,7 +23,7 @@ export const sendMessageSchema = z.object({
     .max(50, 'Payment method cannot exceed 50 characters')
     .trim()
     .optional(),
-});
+}).strict();
 
 // ─── Set Agreed Price ─────────────────────────────────────────────────────────
 
@@ -33,7 +33,7 @@ export const setAgreedPriceSchema = z.object({
     .int('Price must be a whole number')
     .min(1, 'Minimum price is 1 CampusCoin')
     .max(50000, 'Maximum price is 50000 CampusCoins'),
-});
+}).strict();
 
 // ─── Inferred Types ───────────────────────────────────────────────────────────
 

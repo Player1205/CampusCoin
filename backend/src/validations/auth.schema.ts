@@ -39,6 +39,7 @@ export const registerSchema = z
 
     department: z.string().max(100).trim().optional(),
   })
+  .strict()
   .refine((data) => data.password === data.confirmPassword, {
     message: 'Passwords do not match',
     path: ['confirmPassword'],
@@ -49,7 +50,7 @@ export const registerSchema = z
 export const loginSchema = z.object({
   email: emailRule,
   password: z.string({ required_error: 'Password is required' }).min(1, 'Password is required'),
-});
+}).strict();
 
 // ─── Change Password Schema ───────────────────────────────────────────────────
 
@@ -59,6 +60,7 @@ export const changePasswordSchema = z
     newPassword: passwordRule,
     confirmNewPassword: z.string({ required_error: 'Please confirm your new password' }),
   })
+  .strict()
   .refine((data) => data.newPassword === data.confirmNewPassword, {
     message: 'New passwords do not match',
     path: ['confirmNewPassword'],

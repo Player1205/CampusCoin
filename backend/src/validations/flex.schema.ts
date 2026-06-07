@@ -36,7 +36,7 @@ export const createPostSchema = z.object({
     )
     .max(10, 'You can tag a maximum of 10 users')
     .default([]),
-});
+}).strict();
 
 // ─── Update Post ──────────────────────────────────────────────────────────────
 
@@ -54,7 +54,7 @@ export const updatePostSchema = z.object({
     .max(2048, 'Image URL is too long')
     .optional()
     .or(z.literal('')),
-});
+}).strict();
 
 // ─── Create Comment ───────────────────────────────────────────────────────────
 
@@ -64,7 +64,7 @@ export const createCommentSchema = z.object({
     .min(1, 'Comment cannot be empty')
     .max(500, 'Comment cannot exceed 500 characters')
     .trim(),
-});
+}).strict();
 
 // ─── Query / Filter Posts ─────────────────────────────────────────────────────
 
