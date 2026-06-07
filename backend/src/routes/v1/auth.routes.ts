@@ -3,6 +3,7 @@ import * as authController from '../../controllers/auth.controller';
 import { protect } from '../../middlewares/auth.middleware';
 import { validate } from '../../middlewares/validate.middleware';
 import { registerSchema, loginSchema } from '../../validations/auth.schema';
+import { authLimiter } from '../../middlewares/rateLimiter.middleware';
 
 const router = Router();
 
@@ -11,14 +12,14 @@ const router = Router();
  * @desc    Register a new student account
  * @access  Public
  */
-router.post('/register', validate(registerSchema), authController.register);
+router.post('/register', authLimiter, validate(registerSchema), authController.register);
 
 /**
  * @route   POST /api/v1/auth/login
  * @desc    Authenticate user & receive JWT cookie
  * @access  Public
  */
-router.post('/login', validate(loginSchema), authController.login);
+router.post('/login', authLimiter, validate(loginSchema), authController.login);
 
 /**
  * @route   POST /api/v1/auth/logout
