@@ -68,8 +68,15 @@ exports.getChatById = getChatById;
 const sendMessage = async (req, res, next) => {
     try {
         const { content, type, paymentAmount, paymentMethod } = req.body;
-        const chat = await chatService.sendMessage(req.params.chatId, req.user._id.toString(), content, type, paymentAmount, paymentMethod);
+        const chatId = req.params.chatId;
+        const chat = await chatService.sendMessage(chatId, req.user._id.toString(), content, type, paymentAmount, paymentMethod);
         res.status(200).json({ status: 'success', data: { chat } });
+        const { io } = await Promise.resolve().then(() => __importStar(require('../server')));
+        const lastMsg = chat.messages[chat.messages.length - 1];
+        io.to(`chat:${chatId}`).emit('new_message', {
+            chatId,
+            message: lastMsg,
+        });
     }
     catch (err) {
         next(err);
@@ -79,8 +86,14 @@ exports.sendMessage = sendMessage;
 const setAgreedPrice = async (req, res, next) => {
     try {
         const { price } = req.body;
-        const chat = await chatService.setAgreedPrice(req.params.chatId, req.user._id.toString(), price);
+        const chatId = req.params.chatId;
+        const chat = await chatService.setAgreedPrice(chatId, req.user._id.toString(), price);
         res.status(200).json({ status: 'success', data: { chat } });
+        const { io } = await Promise.resolve().then(() => __importStar(require('../server')));
+        io.to(`chat:${chatId}`).emit('price_updated', {
+            chatId,
+            agreedPrice: price,
+        });
     }
     catch (err) {
         next(err);

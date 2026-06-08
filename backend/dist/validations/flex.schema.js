@@ -68,5 +68,9 @@ exports.postQuerySchema = zod_1.z.object({
         .regex(MONGO_ID_REGEX, 'Invalid author ID format')
         .optional(),
     sortBy: zod_1.z.enum(['newest', 'oldest', 'most_liked']).default('newest'),
+    cursor: zod_1.z
+        .string()
+        .datetime({ message: 'Cursor must be a valid ISO date string' })
+        .optional(),
 });
 //# sourceMappingURL=flex.schema.js.map

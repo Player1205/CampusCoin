@@ -40,6 +40,7 @@ exports.toggleCommentLike = exports.deleteComment = exports.addComment = exports
 const mongoose_1 = require("mongoose");
 const Post_1 = __importDefault(require("../models/Post"));
 const service_helpers_1 = require("../utils/service.helpers");
+const cloudinary_1 = require("../utils/cloudinary");
 const postNotFound = () => (0, service_helpers_1.makeAppError)('Post not found.', 404);
 const forbidden = (msg = 'You do not have permission to perform this action.') => (0, service_helpers_1.makeAppError)(msg, 403);
 const ensurePostExists = async (postId) => {
@@ -51,18 +52,22 @@ const ensurePostExists = async (postId) => {
     return post;
 };
 const listPosts = async (query, university) => {
-    const { page, limit, type, authorId, sortBy } = query;
+    const { page, limit, type, authorId, sortBy, cursor } = query;
     const filter = { university, isVisible: true };
     if (type)
         filter.type = type;
     if (authorId)
         filter.author = authorId;
+    const useCursor = !!cursor;
+    if (useCursor) {
+        filter.createdAt = { $lt: new Date(cursor) };
+    }
+    const skip = useCursor ? 0 : (page - 1) * limit;
     const sortMap = {
         newest: { isPinned: -1, createdAt: -1 },
         oldest: { createdAt: 1 },
         most_liked: { isPinned: -1 },
     };
-    const skip = (page - 1) * limit;
     if (sortBy === 'most_liked') {
         const [results] = await Promise.all([
             Post_1.default.aggregate([
@@ -84,6 +89,9 @@ const listPosts = async (query, university) => {
             ]),
         ]);
         const total = await Post_1.default.countDocuments(filter);
+        const nextCursor = results.length === limit && results.length > 0
+            ? new Date(results[results.length - 1].createdAt).toISOString()
+            : null;
         return {
             data: results,
             pagination: {
@@ -91,8 +99,9 @@ const listPosts = async (query, university) => {
                 page,
                 limit,
                 totalPages: Math.ceil(total / limit),
-                hasNextPage: page * limit < total,
+                hasNextPage: useCursor ? nextCursor !== null : page * limit < total,
                 hasPrevPage: page > 1,
+                nextCursor,
             },
         };
     }
@@ -107,6 +116,9 @@ const listPosts = async (query, university) => {
             .lean(),
         Post_1.default.countDocuments(filter),
     ]);
+    const nextCursor = posts.length === limit && posts.length > 0
+        ? new Date(posts[posts.length - 1].createdAt).toISOString()
+        : null;
     return {
         data: posts,
         pagination: {
@@ -114,8 +126,9 @@ const listPosts = async (query, university) => {
             page,
             limit,
             totalPages: Math.ceil(total / limit),
-            hasNextPage: page * limit < total,
+            hasNextPage: useCursor ? nextCursor !== null : page * limit < total,
             hasPrevPage: page > 1,
+            nextCursor,
         },
     };
 };
@@ -131,8 +144,13 @@ const getPostById = async (postId) => {
 };
 exports.getPostById = getPostById;
 const createPost = async (input, authorId, university) => {
+    let imageUrl = input.imageUrl;
+    if (imageUrl && imageUrl.startsWith('data:image/')) {
+        imageUrl = await (0, cloudinary_1.uploadImage)(imageUrl, 'campuscoin/posts');
+    }
     const post = await Post_1.default.create({
         ...input,
+        imageUrl,
         author: authorId,
         university,
         taggedUsers: input.taggedUsers.map((id) => new mongoose_1.Types.ObjectId(id)),

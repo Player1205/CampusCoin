@@ -1,7 +1,7 @@
 import { IPost, PostDocument } from '../models/Post';
 import { CreatePostInput, UpdatePostInput, CreateCommentInput, PostQueryInput } from '../validations/flex.schema';
-import { PaginatedResult } from '../utils/service.helpers';
-export declare const listPosts: (query: PostQueryInput, university: string) => Promise<PaginatedResult<IPost>>;
+import { CursorPaginatedResult } from '../utils/service.helpers';
+export declare const listPosts: (query: PostQueryInput, university: string) => Promise<CursorPaginatedResult<IPost>>;
 export declare const getPostById: (postId: string) => Promise<PostDocument>;
 export declare const createPost: (input: CreatePostInput, authorId: string, university: string) => Promise<PostDocument>;
 export declare const updatePost: (postId: string, input: UpdatePostInput, requesterId: string) => Promise<PostDocument>;

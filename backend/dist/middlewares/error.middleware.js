@@ -4,8 +4,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.errorHandler = void 0;
-const chalk_1 = __importDefault(require("chalk"));
 const mongoose_1 = require("mongoose");
+const logger_1 = __importDefault(require("../utils/logger"));
 const handleMongooseCastError = (err) => ({
     statusCode: 400,
     message: `Invalid value "${String(err.value)}" for field "${err.path}".`,
@@ -26,10 +26,11 @@ const handleDuplicateKeyError = (err) => {
     };
 };
 const errorHandler = (err, _req, res, _next) => {
-    console.error(chalk_1.default.red('✖  Error:'), chalk_1.default.yellow(err.message));
-    if (process.env.NODE_ENV === 'development') {
-        console.error(chalk_1.default.gray(err.stack ?? ''));
-    }
+    logger_1.default.error('Request error', {
+        message: err.message,
+        statusCode: err.statusCode ?? 500,
+        stack: err.stack,
+    });
     let statusCode = err.statusCode ?? 500;
     let message = err.message ?? 'An unexpected error occurred.';
     let errors;

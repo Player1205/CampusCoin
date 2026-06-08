@@ -153,7 +153,9 @@ const boot = async (): Promise<void> => {
   });
 };
 
-boot().catch((err: unknown) => {
-  logger.error('Boot failed', { error: err });
-  process.exit(1);
-});
+if (process.env.NODE_ENV !== 'test') {
+  boot().catch((err: unknown) => {
+    logger.error('Boot failed', { error: err });
+    process.exit(1);
+  });
+}

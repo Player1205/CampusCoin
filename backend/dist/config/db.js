@@ -5,14 +5,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.disconnectDB = exports.connectDB = void 0;
 const mongoose_1 = __importDefault(require("mongoose"));
-const chalk_1 = __importDefault(require("chalk"));
+const logger_1 = __importDefault(require("../utils/logger"));
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 3000;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const connectDB = async () => {
     const uri = process.env.MONGO_URI;
     if (!uri) {
-        console.error(chalk_1.default.red('✖  MONGO_URI is not defined in environment variables.'));
+        logger_1.default.error('MONGO_URI is not defined in environment variables.');
         process.exit(1);
     }
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -22,20 +22,23 @@ const connectDB = async () => {
                 serverSelectionTimeoutMS: 5000,
                 socketTimeoutMS: 45000,
             });
-            console.log(chalk_1.default.green(`✔  MongoDB connected: ${chalk_1.default.bold(conn.connection.host)} `) +
-                chalk_1.default.gray(`[attempt ${attempt}/${MAX_RETRIES}]`));
+            logger_1.default.info('MongoDB connected', {
+                host: conn.connection.host,
+                attempt: `${attempt}/${MAX_RETRIES}`,
+            });
             return;
         }
         catch (err) {
             const message = err instanceof Error ? err.message : String(err);
-            console.error(chalk_1.default.red(`✖  MongoDB connection failed (attempt ${attempt}/${MAX_RETRIES}): `) +
-                chalk_1.default.yellow(message));
+            logger_1.default.error(`MongoDB connection failed (attempt ${attempt}/${MAX_RETRIES})`, {
+                error: message,
+            });
             if (attempt < MAX_RETRIES) {
-                console.log(chalk_1.default.yellow(`   Retrying in ${RETRY_DELAY_MS / 1000}s…`));
+                logger_1.default.warn(`Retrying in ${RETRY_DELAY_MS / 1000}s…`);
                 await sleep(RETRY_DELAY_MS);
             }
             else {
-                console.error(chalk_1.default.red.bold('   Max retries reached. Exiting.'));
+                logger_1.default.error('Max retries reached. Exiting.');
                 process.exit(1);
             }
         }
@@ -44,7 +47,7 @@ const connectDB = async () => {
 exports.connectDB = connectDB;
 const disconnectDB = async () => {
     await mongoose_1.default.connection.close();
-    console.log(chalk_1.default.yellow('⚠  MongoDB connection closed.'));
+    logger_1.default.warn('MongoDB connection closed.');
 };
 exports.disconnectDB = disconnectDB;
 //# sourceMappingURL=db.js.map

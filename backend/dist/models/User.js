@@ -80,6 +80,8 @@ userSchema.methods.toSafeObject = function () {
     const { password, ...safe } = this.toObject();
     return safe;
 };
+userSchema.index({ university: 1, isActive: 1 });
+userSchema.index({ isVerified: 1 });
 const User = mongoose_1.default.model('User', userSchema);
 exports.default = User;
 //# sourceMappingURL=User.js.map

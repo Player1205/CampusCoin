@@ -38,15 +38,18 @@ export declare const postQuerySchema: z.ZodObject<{
     type: z.ZodOptional<z.ZodEnum<["achievement", "skill_offer", "shoutout", "question", "general"]>>;
     authorId: z.ZodOptional<z.ZodString>;
     sortBy: z.ZodDefault<z.ZodEnum<["newest", "oldest", "most_liked"]>>;
+    cursor: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     limit: number;
     page: number;
     sortBy: "newest" | "oldest" | "most_liked";
     type?: "achievement" | "skill_offer" | "shoutout" | "question" | "general" | undefined;
+    cursor?: string | undefined;
     authorId?: string | undefined;
 }, {
     type?: "achievement" | "skill_offer" | "shoutout" | "question" | "general" | undefined;
     limit?: string | undefined;
+    cursor?: string | undefined;
     page?: string | undefined;
     sortBy?: "newest" | "oldest" | "most_liked" | undefined;
     authorId?: string | undefined;
