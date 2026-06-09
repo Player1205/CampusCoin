@@ -48,4 +48,30 @@ Students are rewarded for contributing positively to the campus ecosystem:
 
 ---
 
+## 🏗️ Architecture & Tech Stack
+
+CampusCoin is built on a strictly typed **MERN** stack (MongoDB, Express, React, Node.js) with a focus on real-time capabilities and high performance.
+
+- **Frontend**: React (Vite), TypeScript, TailwindCSS v3, Zustand (State Management), PWA Configured.
+- **Backend**: Node.js, Express, TypeScript, Zod (Schema Validation).
+- **Database**: MongoDB Atlas via Mongoose ODM.
+- **Real-Time**: Socket.io with Redis Adapter for horizontal scalability.
+
+For a detailed breakdown of the folder structure, request lifecycle, and backend logic, please see our dedicated guide: 
+👉 [**System Architecture Documentation**](./SYSTEM_ARCHITECTURE.md)
+
+---
+
+## 🧪 Testing & Reliability
+
+The application backend uses **Jest** and **Supertest** combined with an isolated **MongoMemoryReplSet** to ensure the core escrow features and data integrity are never compromised during development.
+
+To run the full suite of integration and unit tests:
+```bash
+cd backend
+npm test
+```
+
+---
+
 _Built by students, for students._ 🚀
