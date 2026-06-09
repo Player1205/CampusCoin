@@ -98,7 +98,7 @@ export const submitTaskSchema = z.object({
     .trim(),
 }).strict();
 
-// ─── Complete Task (poster approval) ─────────────────────────────────────────
+// ─── Complete Task (poster approval / doer confirmation) ──────────────────────
 
 export const completeTaskSchema = z.object({
   completionNote: z
@@ -107,6 +107,10 @@ export const completeTaskSchema = z.object({
     .trim()
     .optional(),
 }).strict();
+
+// ─── Claim Payment (poster claims fiat sent) ──────────────────────────────────
+
+export const claimPaymentSchema = z.object({}).strict();
 
 // ─── Query / Filter Tasks ─────────────────────────────────────────────────────
 
@@ -153,4 +157,5 @@ export type ApplyToTaskInput = z.infer<typeof applyToTaskSchema>;
 export type AssignDoerInput = z.infer<typeof assignDoerSchema>;
 export type SubmitTaskInput = z.infer<typeof submitTaskSchema>;
 export type CompleteTaskInput = z.infer<typeof completeTaskSchema>;
+export type ClaimPaymentInput = z.infer<typeof claimPaymentSchema>;
 export type TaskQueryInput = z.infer<typeof taskQuerySchema>;

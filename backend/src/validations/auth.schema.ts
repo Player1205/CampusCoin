@@ -13,7 +13,10 @@ const emailRule = z
   .string({ required_error: 'Email is required' })
   .email('Please provide a valid email address')
   .toLowerCase()
-  .trim();
+  .trim()
+  .refine((val) => val.endsWith('@cuchd.in'), {
+    message: 'Only Chandigarh University (@cuchd.in) emails are allowed',
+  });
 
 // ─── Register Schema ──────────────────────────────────────────────────────────
 

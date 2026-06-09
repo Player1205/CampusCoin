@@ -321,20 +321,36 @@ export const submitTask = async (
   return task;
 };
 
-// ─── Service: Complete Task ───────────────────────────────────────────────────
+// ─── Service: Claim Payment (Poster) ──────────────────────────────────────────
 
-export const completeTask = async (
+export const claimPayment = async (
   taskId: string,
-  input: CompleteTaskInput,
   posterId: string
 ): Promise<TaskDocument> => {
   const task = await ensureTaskExists(taskId);
 
   if (task.poster.toString() !== posterId) throw forbidden();
-  if (task.status !== 'submitted') throw makeAppError('You can only approve a submitted task.', 400);
-  if (!task.doer) throw makeAppError('No doer assigned to this task.', 400);
+  if (task.status !== 'submitted') throw makeAppError('You can only claim payment for a submitted task.', 400);
 
-  const doerId = task.doer.toString();
+  task.paymentClaimed = true;
+  await task.save();
+  return task;
+};
+
+// ─── Service: Complete Task (Doer confirms receipt) ──────────────────────────
+
+export const completeTask = async (
+  taskId: string,
+  input: CompleteTaskInput,
+  doerId: string
+): Promise<TaskDocument> => {
+  const task = await ensureTaskExists(taskId);
+
+  if (!task.doer || task.doer.toString() !== doerId) throw forbidden('Only the doer can confirm receipt of payment.');
+  if (task.status !== 'submitted') throw makeAppError('Task is not in a submitted state.', 400);
+  if (!task.paymentClaimed) throw makeAppError('Poster has not yet claimed payment.', 400);
+
+  const posterId = task.poster.toString();
 
   // Transfer escrowed coins from poster → doer
   await transferCoins(posterId, doerId, task.coinReward);

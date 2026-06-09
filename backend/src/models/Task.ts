@@ -74,6 +74,7 @@ export interface ITask {
   submissionNote?: string;       // Message from doer on submission
   completionNote?: string;       // Feedback from poster on completion
   university: string;            // Scoped to poster's university
+  paymentClaimed: boolean;       // Poster claims fiat payment sent
   viewCount: number;
   createdAt: Date;
   updatedAt: Date;
@@ -160,6 +161,10 @@ const taskSchema = new Schema<ITask, TaskModel>(
       type: String,
       required: true,
       index: true,
+    },
+    paymentClaimed: {
+      type: Boolean,
+      default: false,
     },
     viewCount: {
       type: Number,

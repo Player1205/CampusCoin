@@ -73,6 +73,11 @@ export const submitTask = async (id: string, payload: SubmitTaskPayload): Promis
   return unwrap<{ task: Task }>(res).task;
 };
 
+export const claimPayment = async (id: string): Promise<Task> => {
+  const res = await api.post(`/swap/tasks/${id}/claim-payment`);
+  return unwrap<{ task: Task }>(res).task;
+};
+
 export const completeTask = async (id: string, payload?: CompleteTaskPayload): Promise<Task> => {
   const res = await api.post(`/swap/tasks/${id}/complete`, payload ?? {});
   return unwrap<{ task: Task }>(res).task;

@@ -11,6 +11,7 @@ export interface ChatTask {
   coinReward: number;
   category: string;
   status: string;
+  paymentClaimed?: boolean;
   description?: string;
 }
 

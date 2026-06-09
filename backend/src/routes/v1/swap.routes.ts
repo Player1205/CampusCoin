@@ -10,6 +10,7 @@ import {
   assignDoerSchema,
   submitTaskSchema,
   completeTaskSchema,
+  claimPaymentSchema,
   taskQuerySchema,
 } from '../../validations/swap.schema';
 
@@ -98,8 +99,15 @@ router.post('/tasks/:id/assign', validate(assignDoerSchema), swapController.assi
 router.post('/tasks/:id/submit', validate(submitTaskSchema), swapController.submitTask);
 
 /**
+ * @route   POST /api/v1/swap/tasks/:id/claim-payment
+ * @desc    Claim fiat payment was sent via deep link (poster only)
+ * @access  Protected
+ */
+router.post('/tasks/:id/claim-payment', validate(claimPaymentSchema), swapController.claimPayment);
+
+/**
  * @route   POST /api/v1/swap/tasks/:id/complete
- * @desc    Approve submission and release coins to doer (poster only)
+ * @desc    Confirm fiat received and release coins (doer only)
  * @access  Protected
  */
 router.post('/tasks/:id/complete', validate(completeTaskSchema), swapController.completeTask);

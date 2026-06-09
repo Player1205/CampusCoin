@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 describe('User Model', () => {
   const validUserData = {
     name: 'Test User',
-    email: 'test@university.edu',
+    email: 'test@cuchd.in',
     password: 'Password123!',
     university: 'Test University',
   };

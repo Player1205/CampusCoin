@@ -5,7 +5,7 @@ import User from '../../src/models/User';
 describe('Auth API Integration', () => {
   const validRegisterData = {
     name: 'Test Student',
-    email: 'student@university.edu',
+    email: 'student@cuchd.in',
     password: 'Password123!',
     confirmPassword: 'Password123!',
     university: 'Test University'

@@ -40,7 +40,7 @@ export default function RegisterPage() {
 
   const fields: { key: keyof typeof form; label: string; type: string; placeholder: string; icon: React.ElementType; required: boolean }[] = [
     { key: 'name', label: 'Full Name', type: 'text', placeholder: 'Ada Lovelace', icon: User, required: true },
-    { key: 'email', label: 'University Email', type: 'email', placeholder: 'you@university.edu', icon: Mail, required: true },
+    { key: 'email', label: 'University Email', type: 'email', placeholder: 'you@cuchd.in', icon: Mail, required: true },
     { key: 'university', label: 'University', type: 'text', placeholder: 'MIT, Stanford, IIT…', icon: Building2, required: true },
     { key: 'department', label: 'Department (optional)', type: 'text', placeholder: 'Computer Science', icon: Building2, required: false },
     { key: 'password', label: 'Password', type: 'password', placeholder: '8+ chars, 1 uppercase, 1 number', icon: Lock, required: true },

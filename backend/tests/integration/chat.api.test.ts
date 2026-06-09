@@ -12,7 +12,7 @@ describe('Chat API Integration', () => {
       .post('/api/v1/auth/register')
       .send({
         name: 'User A',
-        email: 'usera.chat@university.edu',
+        email: 'usera.chat@cuchd.in',
         password: 'Password123!',
         confirmPassword: 'Password123!',
         university: 'Test University'
@@ -24,7 +24,7 @@ describe('Chat API Integration', () => {
       .post('/api/v1/auth/register')
       .send({
         name: 'User B',
-        email: 'userb.chat@university.edu',
+        email: 'userb.chat@cuchd.in',
         password: 'Password123!',
         confirmPassword: 'Password123!',
         university: 'Test University'

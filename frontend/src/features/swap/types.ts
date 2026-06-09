@@ -59,6 +59,7 @@ export interface Task {
   applications: TaskApplication[];
   submissionNote?: string;
   completionNote?: string;
+  paymentClaimed?: boolean;
   university: string;
   viewCount: number;
   hasChat?: boolean;

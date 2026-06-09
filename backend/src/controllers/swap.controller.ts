@@ -206,6 +206,28 @@ export const submitTask = async (
   }
 };
 
+// ─── POST /api/v1/swap/tasks/:id/claim-payment ────────────────────────────────
+
+export const claimPayment = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const task = await taskService.claimPayment(
+      req.params.id,
+      req.user!._id.toString()
+    );
+
+    res.status(200).json({
+      status: 'success',
+      data: { task },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // ─── POST /api/v1/swap/tasks/:id/complete ────────────────────────────────────
 
 export const completeTask = async (

@@ -7,7 +7,7 @@ import {
 import { useChatList, useChatRoom } from '@/features/chat/hooks/useChat';
 import type { Chat, UPIMethodId } from '@/features/chat/types';
 import { UPI_METHODS } from '@/features/chat/types';
-import { submitTask as apiSubmitTask, completeTask as apiCompleteTask, assignDoer as apiAssignDoer } from '@/features/swap/services/swap.api';
+import { submitTask as apiSubmitTask, completeTask as apiCompleteTask, assignDoer as apiAssignDoer, claimPayment as apiClaimPayment } from '@/features/swap/services/swap.api';
 import { useAuthStore } from '@/store/useAuthStore';
 import { formatDistanceToNow } from '@/utils/time';
 import toast from 'react-hot-toast';
@@ -201,12 +201,12 @@ function ChatRoom({ chatId, onBack }: { chatId: string; onBack: () => void }) {
   };
 
   const handlePayment = async (method: UPIMethodId, amount: number) => {
-    // Complete the task on the backend before redirecting
+    // Poster claims they have sent payment
     try {
-      await apiCompleteTask(chat.task._id, {});
-      toast.success('Task approved!');
+      await apiClaimPayment(chat.task._id);
+      toast.success('Payment claim registered! Opening UPI app...');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to complete task.');
+      toast.error(err instanceof Error ? err.message : 'Failed to register payment.');
       return;
     }
 
@@ -377,23 +377,16 @@ function ChatRoom({ chatId, onBack }: { chatId: string; onBack: () => void }) {
           )}
 
           {/* Poster: Approve & Pay */}
-          {amIPoster && chat.task.status === 'submitted' && (
+          {amIPoster && chat.task.status === 'submitted' && !chat.task.paymentClaimed && (
             <button
               disabled={lifecycleLoading}
               onClick={async () => {
                 if (chat.agreedPrice) {
                   setShowPayment(true);
                 } else {
-                  setLifecycleLoading(true);
-                  try {
-                    await apiCompleteTask(chat.task._id, {});
-                    toast.success(`🎉 Task approved!`);
-                    window.location.reload();
-                  } catch (err) {
-                    toast.error(err instanceof Error ? err.message : 'Failed to complete.');
-                  } finally {
-                    setLifecycleLoading(false);
-                  }
+                  // If they didn't negotiate, default to the coin reward for fiat mapping
+                  // but ideally, they should use the UPI modal always.
+                  setShowPayment(true);
                 }
               }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-body text-xs font-semibold transition-all active:scale-95"
@@ -410,12 +403,51 @@ function ChatRoom({ chatId, onBack }: { chatId: string; onBack: () => void }) {
             </button>
           )}
 
-          {/* Doer sees "Submitted, awaiting poster" */}
-          {!amIPoster && chat.task.status === 'submitted' && (
+          {/* Poster: Payment Claimed Wait State */}
+          {amIPoster && chat.task.status === 'submitted' && chat.task.paymentClaimed && (
             <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-body text-xs font-medium"
                   style={{ background: 'rgba(124,58,237,0.08)', color: 'var(--primary-lt)' }}>
-              ⏳ Awaiting poster approval
+              ⏳ Waiting for Doer to confirm receipt
             </span>
+          )}
+
+          {/* Doer sees "Submitted, awaiting poster" or "Poster claims payment" */}
+          {!amIPoster && chat.task.status === 'submitted' && (
+            <>
+              {!chat.task.paymentClaimed ? (
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-body text-xs font-medium"
+                      style={{ background: 'rgba(124,58,237,0.08)', color: 'var(--primary-lt)' }}>
+                  ⏳ Awaiting poster payment
+                </span>
+              ) : (
+                <button
+                  disabled={lifecycleLoading}
+                  onClick={async () => {
+                    setLifecycleLoading(true);
+                    try {
+                      await apiCompleteTask(chat.task._id, {});
+                      toast.success('Receipt confirmed! Escrow released 🎉');
+                      window.location.reload();
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : 'Failed to confirm receipt.');
+                    } finally {
+                      setLifecycleLoading(false);
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-body text-xs font-bold transition-all active:scale-95 animate-pulse-soft"
+                  style={{
+                    background: 'var(--success)',
+                    color: 'white',
+                    boxShadow: '0 4px 14px rgba(22, 163, 74, 0.4)',
+                  }}
+                >
+                  {lifecycleLoading
+                    ? <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    : <><IndianRupee size={13} /> Confirm Payment Received</>
+                  }
+                </button>
+              )}
+            </>
           )}
 
           {/* Completed badge */}

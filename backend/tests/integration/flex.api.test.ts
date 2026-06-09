@@ -12,7 +12,7 @@ describe('Flex Feed API', () => {
       .post('/api/v1/auth/register')
       .send({
         name: 'Flex User',
-        email: 'flex@university.edu',
+        email: 'flex@cuchd.in',
         password: 'Password123!',
         confirmPassword: 'Password123!',
         university: 'Test University'
