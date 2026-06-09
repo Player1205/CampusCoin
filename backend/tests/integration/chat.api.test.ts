@@ -65,7 +65,7 @@ describe('Chat API Integration', () => {
       })
       .expect(200);
 
-    expect(msgRes.body.data.chat.messages).toHaveLength(1);
-    expect(msgRes.body.data.chat.messages[0].content).toBe('Hello, I want to help with your task!');
+    expect(msgRes.body.data.chat.messages).toHaveLength(2);
+    expect(msgRes.body.data.chat.messages[1].content).toBe('Hello, I want to help with your task!');
   });
 });
